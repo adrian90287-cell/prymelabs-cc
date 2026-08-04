@@ -1969,13 +1969,6 @@ function InventoryTab() {
     finally { setLoading(false) }
   }, [adminToken])
 
-  // Fetch CSRF token on mount for state-changing operations
-  useEffect(() => {
-    fetch('/api/csrf-token')
-      .then(r => r.json())
-      .then(d => setCSRFToken(d.token))
-      .catch(() => {})
-  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -5777,7 +5770,6 @@ export default function AdminPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState('orders')
-  const [csrfToken, setCSRFToken] = useState('')
   const [newSubCount, setNewSubCount] = useState(0)
   const [totalSubCount, setTotalSubCount] = useState(0)
   const [pushState, setPushState] = useState('idle') // 'idle' | 'loading' | 'enabled' | 'denied' | 'unsupported'
