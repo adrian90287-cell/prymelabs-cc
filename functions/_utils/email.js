@@ -166,11 +166,12 @@ function slipDisclaimer(lang = 'en', items = null) {
     </td></tr></table>`
 }
 
-export function customerConfirmationHtml({ order_number, customer_name, items, subtotal, total, promo_code, discount_amount, shipping_cost, shipping_rate_name, tax_rate, tax_amount, payment_method, payment_handle, shipping }) {
+export function customerConfirmationHtml({ order_number, customer_name, customer_email, items, subtotal, total, promo_code, discount_amount, shipping_cost, shipping_rate_name, tax_rate, tax_amount, payment_method, payment_handle, shipping }) {
   const method = PAYMENT_LABEL[payment_method] || payment_method
   const addr = shipping
     ? `${escHtml(shipping.address)}, ${escHtml(shipping.city)}, ${escHtml(shipping.state)} ${escHtml(shipping.zip)}`
     : 'Not provided'
+  const trackUrl = customer_email ? `https://prymelabs.cc/track?order_number=${encodeURIComponent(order_number)}&email=${encodeURIComponent(customer_email)}` : null
   const body = `
     ${slipEyebrow('ORDER CONFIRMATION')}
     ${slipH1(`Thank you, ${escHtml(customer_name)}!`)}
@@ -187,15 +188,17 @@ export function customerConfirmationHtml({ order_number, customer_name, items, s
       <div style="background:#ffffff;border:1px solid #cdd9ee;border-radius:8px;padding:12px 16px;margin:0 0 0 20px;font-family:Arial,Helvetica,sans-serif;color:#157347;font-size:16px;font-weight:800;letter-spacing:1px;">${escHtml(order_number)}</div>
     </td></tr></table>
     ${slipInfoBox('SHIPPING TO', addr, '#111111')}
+    ${trackUrl ? `<div style="text-align:center;margin:0 0 24px 0;"><a href="${trackUrl}" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:13px 26px;border-radius:8px;text-decoration:none;font-size:15px;font-family:Arial,Helvetica,sans-serif;">📦 Track Your Order</a></div>` : ''}
     ${slipDisclaimer('en', items)}`
   return prymeEmailShell({ lang: 'en', rightLabel: 'ORDER CONFIRMATION', preheader: `Order ${order_number} received — complete payment to confirm.`, body })
 }
 
-export function customerConfirmationHtmlEs({ order_number, customer_name, items, subtotal, total, promo_code, discount_amount, shipping_cost, shipping_rate_name, tax_rate, tax_amount, payment_method, payment_handle, shipping }) {
+export function customerConfirmationHtmlEs({ order_number, customer_name, customer_email, items, subtotal, total, promo_code, discount_amount, shipping_cost, shipping_rate_name, tax_rate, tax_amount, payment_method, payment_handle, shipping }) {
   const method = PAYMENT_LABEL[payment_method] || payment_method
   const addr = shipping
     ? `${escHtml(shipping.address)}, ${escHtml(shipping.city)}, ${escHtml(shipping.state)} ${escHtml(shipping.zip)}`
     : 'No proporcionada'
+  const trackUrl = customer_email ? `https://prymelabs.cc/track?order_number=${encodeURIComponent(order_number)}&email=${encodeURIComponent(customer_email)}` : null
   const body = `
     ${slipEyebrow('CONFIRMACIÓN DE PEDIDO')}
     ${slipH1(`¡Gracias, ${escHtml(customer_name)}!`)}
@@ -212,6 +215,7 @@ export function customerConfirmationHtmlEs({ order_number, customer_name, items,
       <div style="background:#ffffff;border:1px solid #cdd9ee;border-radius:8px;padding:12px 16px;margin:0 0 0 20px;font-family:Arial,Helvetica,sans-serif;color:#157347;font-size:16px;font-weight:800;letter-spacing:1px;">${escHtml(order_number)}</div>
     </td></tr></table>
     ${slipInfoBox('DIRECCIÓN DE ENVÍO', addr, '#111111')}
+    ${trackUrl ? `<div style="text-align:center;margin:0 0 24px 0;"><a href="${trackUrl}" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:13px 26px;border-radius:8px;text-decoration:none;font-size:15px;font-family:Arial,Helvetica,sans-serif;">📦 Rastrea Tu Pedido</a></div>` : ''}
     ${slipDisclaimer('es', items)}`
   return prymeEmailShell({ lang: 'es', rightLabel: 'CONFIRMACIÓN', preheader: `Pedido ${order_number} recibido — completa el pago para confirmarlo.`, body })
 }

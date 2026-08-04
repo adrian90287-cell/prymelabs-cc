@@ -337,8 +337,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   if (customerEmail) {
     const confirmHtml = isSpanish
-      ? customerConfirmationHtmlEs({ order_number: orderNumber, customer_name: customerName, items: emailItems, payment_method, payment_handle: paymentHandle, shipping, ...emailPricing })
-      : customerConfirmationHtml({ order_number: orderNumber, customer_name: customerName, items: emailItems, payment_method, payment_handle: paymentHandle, shipping, ...emailPricing })
+      ? customerConfirmationHtmlEs({ order_number: orderNumber, customer_name: customerName, customer_email: customerEmail, items: emailItems, payment_method, payment_handle: paymentHandle, shipping, ...emailPricing })
+      : customerConfirmationHtml({ order_number: orderNumber, customer_name: customerName, customer_email: customerEmail, items: emailItems, payment_method, payment_handle: paymentHandle, shipping, ...emailPricing })
     emailJobs.push(sendEmail(env, {
       to: customerEmail,
       subject: isSpanish
