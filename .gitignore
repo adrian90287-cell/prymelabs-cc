@@ -6,6 +6,7 @@ dist(1)/
 .env.local
 .dev.vars
 Store Operations/
+_diagnostics/
 db-backups/
 
 # Files that previously leaked real credentials into git history —
