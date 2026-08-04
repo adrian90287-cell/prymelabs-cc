@@ -21,6 +21,10 @@ remote = true
 binding = "COA_BUCKET"
 bucket_name = "prymelabs-coa"
 
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "prymelabs-images"
+
 [vars]
 STORE_NAME = "Pryme Labs"
 
