@@ -1,13 +1,10 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 // GET — all reviews with product names (newest first), for moderation
 export async function onRequestGet({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
   const { results } = await env.DB.prepare(
     `SELECT r.id, r.product_id, r.customer_name, r.rating, r.comment, r.status, r.created_at,
             p.name AS product_name
@@ -19,7 +16,7 @@ export async function onRequestGet({ request, env }) {
 
 // PUT { id, status } — approve / reject
 export async function onRequestPut({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
   const { id, status } = body
@@ -30,7 +27,7 @@ export async function onRequestPut({ request, env }) {
 
 // DELETE { id }
 export async function onRequestDelete({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
   if (!body.id) return json({ error: 'id required' }, 400)

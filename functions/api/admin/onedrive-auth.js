@@ -1,3 +1,4 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 /**
  * OneDrive OAuth connect/disconnect for admin.
  *
@@ -8,10 +9,6 @@
 import { corsHeaders, json } from '../../_utils/cors.js'
 import { buildAuthUrl, exchangeCodeAndStore } from '../../_utils/onedrive.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 export async function onRequestGet({ request, env }) {
   const url  = new URL(request.url)
@@ -28,7 +25,7 @@ export async function onRequestGet({ request, env }) {
   }
 
   // ── Return the OAuth URL for the admin to open ────────────────────────────
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   if (!env.ONEDRIVE_CLIENT_ID) {
     return json({ error: 'ONEDRIVE_CLIENT_ID secret not configured in Cloudflare' }, 400)
@@ -39,7 +36,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestDelete({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
   await env.DB.prepare("DELETE FROM settings WHERE key = 'onedrive_refresh_token'").run()
   return json({ ok: true })
 }

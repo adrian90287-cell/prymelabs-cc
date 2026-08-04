@@ -1,11 +1,8 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 import { generateToken, sha256Hex } from '../../_utils/crypto.js'
 import { sendEmail, passwordResetHtml, passwordResetHtmlEs } from '../../_utils/email.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 const RESET_TTL_MINUTES = 60 // admin-generated links last a bit longer
 
@@ -13,7 +10,7 @@ const RESET_TTL_MINUTES = 60 // admin-generated links last a bit longer
 // returns it (so the owner can read/copy it to a customer whose email is dead),
 // and also emails it to the customer when they have an address on file.
 export async function onRequestPost({ request, env, waitUntil }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

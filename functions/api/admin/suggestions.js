@@ -1,13 +1,10 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 // GET — fetch all suggestions newest-first
 export async function onRequestGet({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   const { results } = await env.DB.prepare(
     'SELECT id, user_id, customer_name, message, is_read, created_at FROM suggestions ORDER BY created_at DESC'
@@ -18,7 +15,7 @@ export async function onRequestGet({ request, env }) {
 
 // PUT — toggle is_read on a suggestion
 export async function onRequestPut({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
@@ -35,7 +32,7 @@ export async function onRequestPut({ request, env }) {
 
 // DELETE — remove a suggestion
 export async function onRequestDelete({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

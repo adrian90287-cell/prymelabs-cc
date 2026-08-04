@@ -1,3 +1,4 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 import { hmacHex, hashPassword, generateToken } from '../../_utils/crypto.js'
 import {
@@ -12,10 +13,6 @@ import { uploadToOneDrive, downloadFromOneDrive } from '../../_utils/onedrive.js
 import { orderReceiptHtml, taxRecordHtml, orderCsvRow, buildCsv } from '../../_utils/documents.js'
 import { resolveSaleConfig, saleAmountForDept } from '../../_utils/sale.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 // Find the user account tied to this email, or create a lightweight, claimable
 // one so the order (user_id is NOT NULL) is properly attributed. A created
@@ -49,7 +46,7 @@ async function findOrCreateUser(env, { email, name, phone, lang }) {
 }
 
 export async function onRequestPost({ request, env, waitUntil }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

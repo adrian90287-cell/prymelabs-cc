@@ -1,3 +1,4 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 import {
   sendEmail, sendSMS,
@@ -11,13 +12,9 @@ import {
 import { uploadToOneDrive } from '../../_utils/onedrive.js'
 import { statusUpdateHtml, orderReceiptHtml, isWillCall } from '../../_utils/documents.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 export async function onRequestPost({ request, env, waitUntil }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

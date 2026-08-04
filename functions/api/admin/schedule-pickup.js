@@ -1,3 +1,4 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10,10 +11,6 @@ import { corsHeaders, json } from '../../_utils/cors.js'
 // Docs: https://docs.easypost.com/docs/pickups
 // ─────────────────────────────────────────────────────────────────────────────
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 function authHeader(apiKey) {
   return { Authorization: `Basic ${btoa(`${apiKey}:`)}` }
@@ -25,7 +22,7 @@ async function getKey(env) {
 }
 
 export async function onRequestGet({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
   const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'last_pickup_json'").first()
   let pickup = null
   try { pickup = JSON.parse(row?.value || 'null') } catch {}
@@ -33,7 +30,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

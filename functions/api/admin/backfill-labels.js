@@ -1,9 +1,6 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 function authHeader(apiKey) {
   return { Authorization: `Basic ${btoa(`${apiKey}:`)}` }
@@ -14,7 +11,7 @@ function authHeader(apiKey) {
 // tracking number against the tracking_code of purchased EasyPost shipments,
 // then writes the label_url (and tracker URL) back into the order's tracking_json.
 export async function onRequestPost({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   const keyRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'easypost_api_key'").first()
   const apiKey = env.EASYPOST_API_KEY || keyRow?.value

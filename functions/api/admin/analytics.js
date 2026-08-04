@@ -1,13 +1,10 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 // Best-sellers + customer metrics, aggregated from active (non-cancelled) orders.
 export async function onRequestGet({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   const { results } = await env.DB.prepare(
     "SELECT user_id, items_json, order_total, subtotal FROM orders WHERE deleted_at IS NULL AND status NOT IN ('cancelled','refunded')"

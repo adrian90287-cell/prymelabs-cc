@@ -1,10 +1,7 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 import { sendEmail, sendSMS } from '../../_utils/email.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 async function getUberToken(clientId, clientSecret) {
   const res = await fetch('https://auth.uber.com/oauth/v2/token', {
@@ -26,7 +23,7 @@ async function getUberToken(clientId, clientSecret) {
 }
 
 export async function onRequestPost({ request, env, waitUntil }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

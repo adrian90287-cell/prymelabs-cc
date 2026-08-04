@@ -1,14 +1,11 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
 
 export async function onRequestGet({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
   const { results } = await env.DB.prepare(
     'SELECT * FROM coa_documents ORDER BY title ASC'
   ).all()
@@ -16,7 +13,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let form
   try { form = await request.formData() } catch { return json({ error: 'Invalid form data' }, 400) }
@@ -44,7 +41,7 @@ export async function onRequestPost({ request, env }) {
 }
 
 export async function onRequestPut({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let form
   try { form = await request.formData() } catch { return json({ error: 'Invalid form data' }, 400) }
@@ -91,7 +88,7 @@ export async function onRequestPut({ request, env }) {
 }
 
 export async function onRequestDelete({ request, env }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
   const { id } = body

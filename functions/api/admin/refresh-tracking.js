@@ -1,10 +1,7 @@
+import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 import { refreshOrderTracking } from '../../_utils/tracking.js'
 
-function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || ''
-  return auth === `Bearer admin:${env.ADMIN_PASSWORD}`
-}
 
 async function getEasyPostKey(env) {
   // Prefer environment variable, fall back to DB setting
@@ -15,7 +12,7 @@ async function getEasyPostKey(env) {
 
 // POST { order_id?: number, force?: boolean }
 export async function onRequestPost({ request, env, waitUntil }) {
-  if (!adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+  if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
   try { body = await request.json() } catch { body = {} }
