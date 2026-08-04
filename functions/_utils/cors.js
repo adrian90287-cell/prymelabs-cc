@@ -1,5 +1,12 @@
+// The real frontend always calls its own API same-origin, which the browser
+// never subjects to CORS checks at all — this header only ever matters for a
+// THIRD-PARTY origin trying to call the API cross-origin from someone else's
+// page, which is exactly what should be blocked. Restricting it away from
+// '*' has zero effect on the real app, preview deployments, or local dev,
+// since all of those are same-origin relative to whatever host is serving
+// the page that made the request.
 export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://prymelabs.cc',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
