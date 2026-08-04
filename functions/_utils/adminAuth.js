@@ -42,6 +42,14 @@ export async function verifyAdminToken(request, env) {
 
   try {
     const payload = await verifyJWT(token, env.JWT_SECRET || 'dev-secret-key');
+    // Customer JWTs (functions/_utils/jwt.js) are signed with this same
+    // JWT_SECRET, so signature validity alone isn't enough — without this
+    // check, any logged-in customer's own token would pass as a valid admin
+    // token. Only a token minted by /api/admin/session with admin:true
+    // (i.e. a fully completed admin login, past 2FA if enabled) is accepted.
+    if (payload.admin !== true) {
+      return { valid: false, error: 'Invalid token' };
+    }
     return { valid: true, payload };
   } catch (e) {
     return { valid: false, error: 'Invalid or expired token' };
