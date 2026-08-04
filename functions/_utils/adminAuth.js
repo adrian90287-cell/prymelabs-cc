@@ -1,6 +1,16 @@
 // Admin authentication helper - validates JWT tokens
 import { constantTimeCompare } from './constantTime.js';
 
+// Cloudflare Pages Functions run on the Workers runtime, which has no
+// Node.js Buffer global (no nodejs_compat flag set) — must use Web Crypto
+// + btoa, matching the signing side in functions/api/admin/session.js.
+function base64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 async function verifyJWT(token, secret) {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Invalid token');
@@ -9,12 +19,7 @@ async function verifyJWT(token, secret) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
 
-  const expectedSig = Buffer.from(
-    await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg))
-  ).toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  const expectedSig = base64url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
 
   // Use constant-time comparison to prevent timing attacks
   if (!constantTimeCompare(expectedSig, parts[2])) throw new Error('Invalid signature');
