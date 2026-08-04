@@ -19,7 +19,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
 
-  const { order_id, status, tracking, notes, reship } = body
+  const { order_id, status, tracking, notes, reship, ready_after } = body
   if (!order_id || !status) return json({ error: 'order_id and status required' }, 400)
 
   const validStatuses = ['pending', 'paid', 'fulfilled', 'shipped', 'completed', 'cancelled', 'refunded']
@@ -54,29 +54,20 @@ export async function onRequestPost({ request, env, waitUntil }) {
     ).bind(JSON.stringify(history), order_id).run()
   }
 
-  const timestampField = status === 'paid' ? ', paid_at = ?' : status === 'fulfilled' ? ', fulfilled_at = ?' : status === 'shipped' ? ', shipped_at = ?' : ''
   const trackingStr = tracking ? JSON.stringify(tracking) : null
+  const timestampCol = status === 'paid' ? 'paid_at' : status === 'fulfilled' ? 'fulfilled_at' : status === 'shipped' ? 'shipped_at' : null
 
-  let query, params
-  if (timestampField) {
-    if (trackingStr) {
-      query = `UPDATE orders SET status = ?, tracking_json = ?${timestampField}${notes != null ? ', notes = ?' : ''} WHERE id = ?`
-      params = notes != null ? [status, trackingStr, now, notes, order_id] : [status, trackingStr, now, order_id]
-    } else {
-      query = `UPDATE orders SET status = ?${timestampField}${notes != null ? ', notes = ?' : ''} WHERE id = ?`
-      params = notes != null ? [status, now, notes, order_id] : [status, now, order_id]
-    }
-  } else {
-    if (trackingStr) {
-      query = `UPDATE orders SET status = ?, tracking_json = ?${notes != null ? ', notes = ?' : ''} WHERE id = ?`
-      params = notes != null ? [status, trackingStr, notes, order_id] : [status, trackingStr, order_id]
-    } else {
-      query = `UPDATE orders SET status = ?${notes != null ? ', notes = ?' : ''} WHERE id = ?`
-      params = notes != null ? [status, notes, order_id] : [status, order_id]
-    }
-  }
+  // Build the SET clause from whichever optional fields were actually provided —
+  // avoids the combinatorial if/else branching this used to need per field.
+  const cols = ['status = ?']
+  const params = [status]
+  if (timestampCol) { cols.push(`${timestampCol} = ?`); params.push(now) }
+  if (trackingStr != null) { cols.push('tracking_json = ?'); params.push(trackingStr) }
+  if (notes != null) { cols.push('notes = ?'); params.push(notes) }
+  if (ready_after != null) { cols.push('ready_after = ?'); params.push(ready_after) }
+  params.push(order_id)
 
-  await env.DB.prepare(query).bind(...params).run()
+  await env.DB.prepare(`UPDATE orders SET ${cols.join(', ')} WHERE id = ?`).bind(...params).run()
 
   // Restore stock when cancelling or refunding a non-cancelled/refunded order
   const wasActive = !['cancelled', 'refunded'].includes(order.status)
