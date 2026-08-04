@@ -30,6 +30,7 @@ export default function App() {
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/test" element={<div className="flex items-center justify-center min-h-screen text-white text-4xl">TEST ROUTE WORKS</div>} />
               <Route path="/shop" element={<ProtectedRoute><ShopPage /></ProtectedRoute>} />
               <Route path="/collections/:deptSlug" element={<ProtectedRoute><CollectionPage /></ProtectedRoute>} />
               <Route path="/collections/:deptSlug/:colSlug" element={<ProtectedRoute><CollectionPage /></ProtectedRoute>} />
