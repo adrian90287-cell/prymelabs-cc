@@ -5884,6 +5884,9 @@ export default function AdminPage() {
       const data = await res.json()
       if (res.ok && data.token) {
         sessionStorage.setItem('pl_admin_token', data.token)
+        // Legacy endpoints check `Bearer admin:<password>` directly against
+        // ADMIN_PASSWORD rather than verifying the JWT — keep both in sync.
+        sessionStorage.setItem('pl_admin', pw)
         setPw('')
         setAuthed(true)
       } else if (res.status === 429) {
