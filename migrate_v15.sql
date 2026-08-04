@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN payment_claimed_at INTEGER DEFAULT NULL;

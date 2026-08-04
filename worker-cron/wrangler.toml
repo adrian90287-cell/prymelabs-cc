@@ -1,0 +1,15 @@
+name = "prymelabs-cron"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# Hourly: pending-order reminders/auto-cancel + tracking sweep.
+# Daily 13:00 UTC (~8am Central): owner digest + post-delivery review requests.
+[triggers]
+crons = ["0 * * * *", "0 13 * * *"]
+
+[vars]
+TARGET_URL = "https://prymelabs.cc/api/cron/process-pending"
+DIGEST_URL = "https://prymelabs.cc/api/cron/daily-digest"
+
+# CRON_SECRET is set as an encrypted secret (wrangler secret put CRON_SECRET),
+# matching the same secret on the Pages project so the endpoint trusts us.

@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes banner-shimmer {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(300%) skewX(-15deg); }
+}
+@keyframes banner-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-banner-shimmer {
+  animation: banner-shimmer 3.5s ease-in-out infinite;
+}
+.animate-banner-scroll {
+  animation: banner-scroll 20s linear infinite;
+}
+
+@layer base {
+  html {
+    background-color: #09090b;
+    color: #fafafa;
+    /* Prevent elastic bounce overscroll on iOS showing white */
+    overscroll-behavior: none;
+  }
+
+  body {
+    /* Safe area padding for iPhone notch / home bar */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Remove blue tap flash on all interactive elements (iOS/Android) */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Prevent iOS Safari from auto-zooming when focusing inputs < 16px */
+  @media (max-width: 640px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Smooth momentum scrolling on iOS for scrollable divs */
+  [class*="overflow-y-auto"],
+  [class*="overflow-x-auto"] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #18181b; }
+  ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+}
+
+/* ── Google Maps Places Autocomplete — dark theme ──────────────────────── */
+.pac-container {
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 14px;
+  margin-top: 4px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+  font-family: Inter, Arial, sans-serif;
+  overflow: hidden;
+  padding: 4px;
+}
+.pac-item {
+  padding: 9px 12px;
+  color: #a1a1aa;
+  font-size: 13px;
+  cursor: pointer;
+  border-top: none;
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+.pac-item:hover,
+.pac-item-selected {
+  background: #27272a;
+  color: #fff;
+}
+.pac-item-query {
+  color: #e4e4e7;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pac-matched { color: #60a5fa; font-weight: 700; }
+.pac-icon { display: none; }
+.pac-logo::after { display: none; }
+
+@keyframes toast-slide-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@layer utilities {
+  /* Toast animation */
+  .toast-slide-up { animation: toast-slide-up 0.18s ease-out; }
+
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Safe area paddings */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+
+  /* Touch-friendly tap targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

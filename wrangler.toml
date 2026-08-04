@@ -1,0 +1,28 @@
+name = "prymelabs-cc"
+compatibility_date = "2024-09-23"
+
+pages_build_output_dir = "dist"
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "prymelabs-db"
+database_id = "a6557b78-9316-495a-a8c3-b85b1a5182bf"
+
+[[d1_databases]]
+binding = "UNIFIED_DB"
+database_name = "prymelabs-unified"
+database_id = "9968a10e-99d4-4f15-a226-fe64f9bab1d8"
+remote = true
+
+[[r2_buckets]]
+binding = "COA_BUCKET"
+bucket_name = "prymelabs-coa"
+
+[vars]
+STORE_NAME = "Pryme Labs"
+
+# All sensitive variables (JWT_SECRET, ADMIN_PASSWORD, RESEND_API_KEY, etc.)
+# are stored as encrypted Cloudflare Pages secrets — not here.

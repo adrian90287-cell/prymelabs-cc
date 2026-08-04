@@ -1,0 +1,12 @@
+name = "prymelabs-email"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# Bound to an address via Cloudflare Email Routing in the dashboard.
+# Receives payment-notification emails, parses them, and POSTs the result to
+# the secured ingest endpoint on the Pages project.
+[vars]
+INGEST_URL = "https://prymelabs.cc/api/payments/ingest"
+
+# PAYMENT_INGEST_SECRET is set as an encrypted secret (wrangler secret put),
+# matching the same secret on the Pages project.
