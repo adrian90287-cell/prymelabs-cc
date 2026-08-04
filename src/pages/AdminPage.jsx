@@ -3096,6 +3096,141 @@ function DeptHeroCard({ department, onSaved }) {
   )
 }
 
+// Self-contained 2FA management card — its own state/effects, only reads
+// adminToken/showToast from its parent, so it can't interfere with the rest
+// of SettingsTab's state.
+function TwoFactorSettings() {
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const showToast = useToast()
+  const [status, setStatus] = useState(null) // { enabled } | null while loading
+  const [setup, setSetup] = useState(null) // { secret, otpauthUrl } while mid-setup
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [disablePw, setDisablePw] = useState('')
+  const [showDisable, setShowDisable] = useState(false)
+
+  const load = useCallback(() => {
+    fetch('/api/admin/totp-disable', { headers: { Authorization: `Bearer ${adminToken}` } })
+      .then(r => r.json())
+      .then(d => setStatus({ enabled: !!d.enabled }))
+      .catch(() => setStatus({ enabled: false }))
+  }, [adminToken])
+
+  useEffect(() => { load() }, [load])
+
+  const startSetup = async () => {
+    setErr(''); setBusy(true)
+    try {
+      const res = await fetch('/api/admin/totp', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Failed to start setup'); return }
+      setSetup(d)
+    } catch { setErr('Network error') }
+    finally { setBusy(false) }
+  }
+
+  const confirmEnable = async (e) => {
+    e.preventDefault()
+    setErr(''); setBusy(true)
+    try {
+      const res = await fetch('/api/admin/totp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ secret: setup.secret, code }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Invalid code'); return }
+      showToast('✓ Two-factor authentication enabled')
+      setSetup(null); setCode('')
+      load()
+    } catch { setErr('Network error') }
+    finally { setBusy(false) }
+  }
+
+  const disable = async (e) => {
+    e.preventDefault()
+    setErr(''); setBusy(true)
+    try {
+      const res = await fetch('/api/admin/totp-disable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ password: disablePw }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Incorrect password'); return }
+      showToast('Two-factor authentication disabled', 'warning')
+      setShowDisable(false); setDisablePw('')
+      load()
+    } catch { setErr('Network error') }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+        <div>
+          <div className="text-white font-bold text-sm flex items-center gap-2 flex-wrap">
+            🔐 Two-Factor Authentication
+            {status?.enabled && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">● Enabled</span>}
+            {status && !status.enabled && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-700/60 text-zinc-500">○ Disabled</span>}
+          </div>
+          <div className="text-zinc-500 text-xs mt-0.5">Requires a code from an authenticator app in addition to your password</div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {!status ? (
+          <div className="text-zinc-600 text-sm">Loading…</div>
+        ) : setup ? (
+          <form onSubmit={confirmEnable} className="space-y-4">
+            <p className="text-zinc-400 text-sm">Add this key to your authenticator app (Google Authenticator, Authy, Microsoft Authenticator, etc.) — manual entry, type "Time based":</p>
+            <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 font-mono text-blue-400 text-sm tracking-wider break-all select-all">{setup.secret}</div>
+            <div>
+              <label className="block text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-1.5">Enter the 6-digit code to confirm</label>
+              <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="123456"
+                value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-center text-xl tracking-[0.3em] font-mono focus:outline-none focus:border-blue-500" />
+            </div>
+            {err && <div className="text-red-400 text-sm">{err}</div>}
+            <div className="flex gap-2">
+              <button type="submit" disabled={busy || code.length !== 6}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors">Confirm & Enable</button>
+              <button type="button" onClick={() => { setSetup(null); setCode(''); setErr('') }}
+                className="px-4 py-2.5 text-zinc-400 hover:text-white text-sm font-semibold transition-colors">Cancel</button>
+            </div>
+          </form>
+        ) : status.enabled ? (
+          showDisable ? (
+            <form onSubmit={disable} className="space-y-3">
+              <label className="block text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-1.5">Confirm your admin password to disable 2FA</label>
+              <input type="password" value={disablePw} onChange={e => setDisablePw(e.target.value)} autoFocus
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+              {err && <div className="text-red-400 text-sm">{err}</div>}
+              <div className="flex gap-2">
+                <button type="submit" disabled={busy || !disablePw}
+                  className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors">Disable 2FA</button>
+                <button type="button" onClick={() => { setShowDisable(false); setDisablePw(''); setErr('') }}
+                  className="px-4 py-2.5 text-zinc-400 hover:text-white text-sm font-semibold transition-colors">Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <button onClick={() => setShowDisable(true)}
+              className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-sm font-bold rounded-xl transition-colors">Disable 2FA</button>
+          )
+        ) : (
+          <>
+            <p className="text-zinc-500 text-sm mb-3">Not enabled — your admin panel currently relies on the password alone.</p>
+            {err && <div className="text-red-400 text-sm mb-3">{err}</div>}
+            <button onClick={startSetup} disabled={busy}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors">Set Up Two-Factor Authentication</button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SettingsTab() {
   const [rates, setRates] = useState([])
   const [settings, setSettings] = useState({ free_shipping_threshold: '0', tax_rate: '0', tax_label: 'Tax', google_maps_key: '', pending_reminder_hours: '24', pending_autocancel_hours: '72', review_request_delay_days: '3', review_promo_code: '' })
@@ -3410,6 +3545,9 @@ function SettingsTab() {
 
   return (
     <div className="space-y-5 max-w-3xl">
+
+      {/* ── Two-Factor Authentication ────────────────────────────────────── */}
+      <TwoFactorSettings />
 
       {/* ── Promo Banner ──────────────────────────────────────────────────── */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
@@ -5767,6 +5905,8 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState(() => !!sessionStorage.getItem('pl_admin_token'))
   const [pw, setPw] = useState('')
   const [loginErr, setLoginErr] = useState('')
+  const [pendingToken, setPendingToken] = useState(null) // set when password is correct but a 2FA code is still needed
+  const [twoFACode, setTwoFACode] = useState('')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState('orders')
@@ -5874,7 +6014,10 @@ export default function AdminPage() {
         body: JSON.stringify({ password: pw })
       })
       const data = await res.json()
-      if (res.ok && data.token) {
+      if (res.ok && data.requires2fa) {
+        setPendingToken(data.pendingToken)
+        // pw is kept (not cleared) so it can still sync 'pl_admin' once 2FA completes
+      } else if (res.ok && data.token) {
         sessionStorage.setItem('pl_admin_token', data.token)
         // Legacy endpoints check `Bearer admin:<password>` directly against
         // ADMIN_PASSWORD rather than verifying the JWT — keep both in sync.
@@ -5889,6 +6032,29 @@ export default function AdminPage() {
     } catch { setLoginErr('Network error. Please try again.') }
   }
 
+  const tryVerify2FA = async (e) => {
+    e.preventDefault()
+    setLoginErr('')
+    try {
+      const res = await fetch('/api/admin/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pendingToken, code: twoFACode })
+      })
+      const data = await res.json()
+      if (res.ok && data.token) {
+        sessionStorage.setItem('pl_admin_token', data.token)
+        sessionStorage.setItem('pl_admin', pw)
+        setPw(''); setPendingToken(null); setTwoFACode('')
+        setAuthed(true)
+      } else if (res.status === 429) {
+        setLoginErr(data.error || 'Too many attempts. Try again later.')
+      } else {
+        setLoginErr(data.error || 'Invalid code')
+      }
+    } catch { setLoginErr('Network error. Please try again.') }
+  }
+
   if (!authed) {
     return (
       <ToastProvider>
@@ -5896,17 +6062,36 @@ export default function AdminPage() {
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
             <h1 className="text-2xl font-black text-white mb-1">Admin</h1>
-            <p className="text-zinc-500 text-sm mb-6">Pryme Labs Order Dashboard</p>
-            <form onSubmit={tryLogin} className="space-y-4">
-              <input type="password" placeholder="Admin password" value={pw} onChange={e => setPw(e.target.value)} autoFocus
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-base" />
-              {loginErr && (
-                <div className={`text-sm px-3 py-2 rounded-lg ${loginErr.includes('many') ? 'bg-orange-500/10 border border-orange-500/30 text-orange-400' : 'text-red-400'}`}>
-                  {loginErr}
-                </div>
-              )}
-              <button type="submit" className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-2xl transition-colors">Sign In</button>
-            </form>
+            <p className="text-zinc-500 text-sm mb-6">
+              {pendingToken ? 'Enter the 6-digit code from your authenticator app' : 'Pryme Labs Order Dashboard'}
+            </p>
+            {pendingToken ? (
+              <form onSubmit={tryVerify2FA} className="space-y-4">
+                <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="123456"
+                  value={twoFACode} onChange={e => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 text-center text-2xl tracking-[0.3em] font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
+                {loginErr && (
+                  <div className={`text-sm px-3 py-2 rounded-lg ${loginErr.includes('many') ? 'bg-orange-500/10 border border-orange-500/30 text-orange-400' : 'text-red-400'}`}>
+                    {loginErr}
+                  </div>
+                )}
+                <button type="submit" disabled={twoFACode.length !== 6}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 text-white font-bold rounded-2xl transition-colors">Verify</button>
+                <button type="button" onClick={() => { setPendingToken(null); setTwoFACode(''); setLoginErr('') }}
+                  className="w-full text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors">← Back to password</button>
+              </form>
+            ) : (
+              <form onSubmit={tryLogin} className="space-y-4">
+                <input type="password" placeholder="Admin password" value={pw} onChange={e => setPw(e.target.value)} autoFocus
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-base" />
+                {loginErr && (
+                  <div className={`text-sm px-3 py-2 rounded-lg ${loginErr.includes('many') ? 'bg-orange-500/10 border border-orange-500/30 text-orange-400' : 'text-red-400'}`}>
+                    {loginErr}
+                  </div>
+                )}
+                <button type="submit" className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-2xl transition-colors">Sign In</button>
+              </form>
+            )}
           </div>
         </div>
       </ToastProvider>

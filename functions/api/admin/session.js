@@ -1,6 +1,7 @@
 // Admin session management - issues secure tokens instead of storing passwords
 // Simple JWT implementation using Web Crypto API (no external dependencies)
 import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js';
+import { verifyTOTP } from '../../_utils/totpCore.js';
 
 function base64url(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -9,10 +10,10 @@ function base64url(buf) {
     .replace(/=/g, '');
 }
 
-async function signJWT(payload, secret) {
+async function signJWT(payload, secret, expiresInSeconds = 8 * 60 * 60) {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
-  const exp = now + (8 * 60 * 60); // 8 hours
+  const exp = now + expiresInSeconds;
 
   const jwtPayload = { ...payload, iat: now, exp };
   const msg = base64url(new TextEncoder().encode(JSON.stringify(header))) + '.' +
@@ -60,6 +61,47 @@ export async function onRequest({ request, env }) {
 async function handleLogin(request, env) {
   try {
     const body = await request.json();
+    const secret = env.JWT_SECRET || 'dev-secret-key';
+
+    // ── Step 2: completing a pending 2FA login (password already verified) ──
+    if (body.pendingToken && body.code) {
+      const rlKey2 = adminRateLimitKey(request, 'login-2fa');
+      const rl2 = await checkAdminRateLimit(env, rlKey2);
+      if (rl2.blocked) {
+        return new Response(JSON.stringify({
+          error: `Too many attempts. Try again in ${Math.ceil(rl2.retryAfter)} second(s).`
+        }), { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': Math.ceil(rl2.retryAfter) } });
+      }
+
+      let pending;
+      try { pending = await verifyJWT(body.pendingToken, secret); } catch { pending = null; }
+      if (!pending || pending.pending2fa !== true) {
+        return new Response(JSON.stringify({ error: 'Login session expired — enter your password again' }), {
+          status: 401, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      const secretRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'admin_2fa_secret'").first();
+      if (!secretRow?.value) {
+        return new Response(JSON.stringify({ error: '2FA is not configured' }), {
+          status: 401, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      const valid = await verifyTOTP(String(body.code), secretRow.value);
+      if (!valid) {
+        return new Response(JSON.stringify({ error: 'Invalid code' }), {
+          status: 401, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      const token = await signJWT({ admin: true }, secret);
+      return new Response(JSON.stringify({ token, expiresIn: 28800 }), {
+        status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
+
+    // ── Step 1: password check ──
     const { password } = body;
     const rlKey = adminRateLimitKey(request, 'login');
 
@@ -80,7 +122,18 @@ async function handleLogin(request, env) {
       });
     }
 
-    const token = await signJWT({ admin: true }, env.JWT_SECRET || 'dev-secret-key');
+    const twoFARow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'admin_2fa_enabled'").first();
+    if (twoFARow?.value === '1') {
+      // Password proven — issue a short-lived pending token instead of the
+      // real admin token. It carries no admin rights (pending2fa only), and
+      // expires in 5 minutes if the code step isn't completed.
+      const pendingToken = await signJWT({ pending2fa: true }, secret, 5 * 60);
+      return new Response(JSON.stringify({ requires2fa: true, pendingToken }), {
+        status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
+
+    const token = await signJWT({ admin: true }, secret);
     return new Response(JSON.stringify({ token, expiresIn: 28800 }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
