@@ -17,7 +17,7 @@ async function verifyJWT(token, secret) {
 
   const msg = parts[0] + '.' + parts[1];
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 
   const expectedSig = base64url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
 
