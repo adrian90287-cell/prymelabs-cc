@@ -42,6 +42,33 @@ export function groupByName(products) {
   return Array.from(map.values())
 }
 
+// Full-screen zoomed view of a single product photo. Works for any image src,
+// so it applies uniformly to every existing and future product with zero
+// per-product setup — it just displays whatever photo is passed in.
+export function ImageLightbox({ src, alt, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = '' }
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 cursor-zoom-out" onClick={onClose}>
+      <div className="absolute inset-0 bg-zinc-950/95 backdrop-blur-sm" />
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-10 w-10 h-10 bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-full flex items-center justify-center transition-colors"
+        aria-label="Close">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <img src={src} alt={alt} className="relative max-h-[90vh] max-w-[90vw] object-contain" onClick={e => e.stopPropagation()} />
+    </div>
+  )
+}
+
 export function ImageFallback({ name }) {
   const initials = name ? name.slice(0, 2).toUpperCase() : 'PL'
   return (
@@ -62,6 +89,7 @@ export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasP
   const [imgFailed, setImgFailed] = useState(false)
   const [limitMsg, setLimitMsg] = useState(null)
   const [activePhoto, setActivePhoto] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const coa = (coaDocs || []).find(d => d.title.trim().toLowerCase() === selected.name.trim().toLowerCase())
 
@@ -102,7 +130,7 @@ export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasP
         <div className="overflow-y-auto">
           <div className="relative bg-zinc-950 flex items-center justify-center" style={{ height: '260px' }}>
             {showImage ? (
-              <img src={mainSrc} alt={selected.name} className="h-full w-full object-contain p-4" onError={() => setImgFailed(true)} />
+              <img src={mainSrc} alt={selected.name} className="h-full w-full object-contain p-4 cursor-zoom-in" onError={() => setImgFailed(true)} onClick={() => setLightboxOpen(true)} />
             ) : (
               <ImageFallback name={selected.name} />
             )}
@@ -200,6 +228,9 @@ export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasP
           </div>
         </div>
       </div>
+      {lightboxOpen && showImage && (
+        <ImageLightbox src={mainSrc} alt={selected.name} onClose={() => setLightboxOpen(false)} />
+      )}
     </div>
   )
 }
