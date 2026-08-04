@@ -7,6 +7,13 @@ export const corsHeaders = {
 export function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders,
+      // public/_headers only covers static assets, not Function responses —
+      // add the safe, behavior-neutral security headers here too.
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    },
   });
 }

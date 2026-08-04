@@ -2,10 +2,19 @@
 // Security: requires both order_number and email for access
 
 import { json } from '../../_utils/cors.js'
+import { checkRateLimit, rateLimitKey } from '../../_utils/rateLimit.js'
 
 export async function onRequest({ request, env }) {
   if (request.method !== 'GET') {
     return json({ error: 'Method not allowed' }, 405)
+  }
+
+  // Rate-limit by IP — prevents brute-forcing order_number/email combos
+  // to pull another customer's name and shipping address.
+  const rlKey = rateLimitKey(request, 'track-order')
+  const rl = await checkRateLimit(env, rlKey)
+  if (rl.blocked) {
+    return json({ error: `Too many requests. Try again in ${Math.ceil(rl.retryAfter / 60)} minute(s).` }, 429)
   }
 
   try {
