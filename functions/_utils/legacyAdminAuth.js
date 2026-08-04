@@ -3,10 +3,11 @@
 // This lets older endpoints keep working during the migration to JWT-only auth
 // without depending on the client keeping two separate credentials in sync.
 import { verifyAdminToken } from './adminAuth.js';
+import { constantTimeCompare } from './constantTime.js';
 
 export async function adminAuth(request, env) {
   const auth = request.headers.get('Authorization') || '';
-  if (auth === `Bearer admin:${env.ADMIN_PASSWORD}`) return true;
+  if (constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`)) return true;
   const result = await verifyAdminToken(request, env);
   return result.valid;
 }
