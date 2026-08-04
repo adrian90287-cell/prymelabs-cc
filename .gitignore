@@ -1,6 +1,14 @@
 node_modules/
 dist/
+dist(1)/
 .wrangler/
 .env
 .env.local
+.dev.vars
 Store Operations/
+db-backups/
+
+# Files that previously leaked real credentials into git history —
+# keep untracked going forward even though local copies remain useful.
+wrangler.toml_my records.txt
+pryme labs app docs/
