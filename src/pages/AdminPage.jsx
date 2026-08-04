@@ -5783,12 +5783,12 @@ export default function AdminPage() {
   const [pushState, setPushState] = useState('idle') // 'idle' | 'loading' | 'enabled' | 'denied' | 'unsupported'
 
   const load = useCallback(async () => {
-    const token = (sessionStorage.getItem('pl_admin') || localStorage.getItem('pl_admin_pw'))
-    if (!token) return
+    const jwt = sessionStorage.getItem('pl_admin_token')
+    if (!jwt) return
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/dashboard', { headers: { Authorization: `Bearer admin:${token}` } })
-      if (res.status === 401) { sessionStorage.removeItem('pl_admin'); localStorage.removeItem('pl_admin_pw'); localStorage.removeItem('pl_admin_bypass'); setAuthed(false); return }
+      const res = await fetch('/api/admin/dashboard', { headers: { Authorization: `Bearer ${jwt}` } })
+      if (res.status === 401) { sessionStorage.removeItem('pl_admin_token'); sessionStorage.removeItem('pl_admin'); setAuthed(false); return }
       const d = await res.json()
       setData(d)
     } catch {}
