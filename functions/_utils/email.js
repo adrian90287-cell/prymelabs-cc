@@ -761,7 +761,12 @@ function prymeEmailShell({ lang = 'en', rightLabel = '', preheader = '', body = 
         <!-- Header -->
         <tr><td class="pl-pad" style="padding:32px 40px 18px 40px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-            <td class="pl-logo" valign="middle" style="font-size:34px;font-weight:800;letter-spacing:3px;color:#111111;font-family:Arial,Helvetica,sans-serif;">PRYME<span style="color:#4f7fd9;">LABS</span></td>
+            <td class="pl-logo" valign="middle">
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                <td valign="middle" style="padding-right:8px;"><img src="https://prymelabs.cc/logo-mark-email.png" width="26" height="28" alt="" style="display:block;" /></td>
+                <td valign="middle" style="font-size:34px;font-weight:800;letter-spacing:3px;color:#111111;font-family:Arial,Helvetica,sans-serif;">PRYME<span style="color:#4f7fd9;">LABS</span></td>
+              </tr></table>
+            </td>
             <td align="right" valign="middle"><span class="pl-label" style="display:inline-block;background:#002b63;color:#ffffff;padding:12px 22px;font-size:14px;font-weight:700;letter-spacing:1px;font-family:Arial,Helvetica,sans-serif;">${rightLabel}</span></td>
           </tr></table>
           <div style="margin-top:18px;line-height:1;">

@@ -81,7 +81,7 @@ export default function AuthPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <img src="/logo.svg" alt="Pryme Labs" className="w-12 h-12" style={{ filter: 'brightness(0) invert(1)' }} />
+            <img src="/logo-mark.png" alt="Pryme Labs" className="w-12 h-12 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
             <h1 className="text-3xl font-black text-white tracking-widest">PRYME<span className="text-blue-500">LABS</span></h1>
           </div>
           <div className="w-16 h-1 bg-blue-600 mx-auto rounded-full" />

@@ -63,7 +63,8 @@ export default function Navbar() {
 
             {/* Logo */}
             <button onClick={() => go('/')}
-              className="text-lg sm:text-xl font-black text-white tracking-widest hover:opacity-80 transition-opacity shrink-0">
+              className="flex items-center gap-1.5 text-lg sm:text-xl font-black text-white tracking-widest hover:opacity-80 transition-opacity shrink-0">
+              <img src="/logo-mark.png" alt="" className="h-6 sm:h-7 w-auto" />
               PRYME<span className="text-blue-500">LABS</span>
             </button>
 
