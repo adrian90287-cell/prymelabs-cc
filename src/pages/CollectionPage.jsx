@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar'
 import CartSidebar from '../components/CartSidebar'
 import Footer from '../components/Footer'
 import { ProductGrid } from '../components/ProductGrid'
+import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import { useCart } from '../context/CartContext'
 import { useT } from '../context/LanguageContext'
 import { authHeaders } from '../lib/authHeaders'
@@ -32,9 +33,16 @@ export default function CollectionPage() {
   const [showWasPrice, setShowWasPrice] = useState(true)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [peptideAcked, setPeptideAcked] = useState(hasAckedPeptideGate())
 
   const department = departmentFromSlug(deptSlug || '')
   const collection = department && colSlug ? collectionFromSlug(department, colSlug) : null
+
+  // Re-check the ack whenever we land on a Peptides route — sessionStorage can
+  // have been cleared by a login/logout since this component last mounted.
+  useEffect(() => {
+    if (department === 'Peptides') setPeptideAcked(hasAckedPeptideGate())
+  }, [department])
 
   useEffect(() => {
     fetch('/api/products', { headers: authHeaders() })
@@ -63,6 +71,19 @@ export default function CollectionPage() {
       <div className="min-h-screen bg-zinc-950"><Navbar /><CartSidebar />
         <div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
         <Footer />
+      </div>
+    )
+  }
+
+  if (department === 'Peptides' && !peptideAcked) {
+    return (
+      <div className="min-h-screen bg-zinc-950">
+        <Navbar />
+        <CartSidebar />
+        <PeptideGate
+          onAgree={() => setPeptideAcked(true)}
+          onDecline={() => navigate('/', { replace: true })}
+        />
       </div>
     )
   }
@@ -98,12 +119,12 @@ export default function CollectionPage() {
 
         {/* Section title — banner photo behind the department name */}
         {DEPT_HERO[department] ? (
-          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 mb-6 h-40 sm:h-52">
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 mb-6 h-56 sm:h-80">
             <img src={DEPT_HERO[department]} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/55 to-zinc-950/10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/35 to-transparent" />
             <div className="relative h-full flex flex-col justify-end p-4 sm:p-6">
-              <h1 className="text-3xl sm:text-4xl font-black text-white drop-shadow-sm">{collection ? colName : deptName}</h1>
-              <p className="text-zinc-300 mt-1 text-sm sm:text-base drop-shadow-sm">
+              <h1 className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{collection ? colName : deptName}</h1>
+              <p className="text-zinc-200 mt-1 text-sm sm:text-base drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
                 {collection ? `${deptName} · ${colName}` : deptSubtitle}
               </p>
             </div>
