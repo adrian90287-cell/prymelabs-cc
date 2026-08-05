@@ -73,7 +73,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       html: `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#09090b;font-family:Inter,Arial,sans-serif">
 <div style="max-width:520px;margin:0 auto;background:#12121f;border:1px solid #1e1e2e;border-radius:16px;overflow:hidden">
   <div style="background:#0d0d1a;padding:18px 24px;border-bottom:1px solid #1e1e2e">
-    <span style="color:#fff;font-size:17px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase">PRYME<span style="color:#3b82f6">LABS</span></span>
+    <img src="https://prymelabs.cc/logo-mark.png" alt="" width="18" height="20" style="vertical-align:middle;margin-right:6px" /><span style="color:#fff;font-size:17px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;vertical-align:middle">PRYME<span style="color:#3b82f6">LABS</span></span>
   </div>
   <div style="padding:24px">
     <p style="color:#4ade80;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin:0 0 10px">🆕 New Subscriber</p>

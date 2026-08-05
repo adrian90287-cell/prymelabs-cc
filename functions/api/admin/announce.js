@@ -136,7 +136,7 @@ ${preview_text ? `<span style="display:none;max-height:0;overflow:hidden">${prev
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
         <tr><td style="background:#12121f;border-radius:16px 16px 0 0;padding:28px 32px;border-bottom:1px solid #1e1e2e">
-          <span style="color:#ffffff;font-size:22px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase">PRYME<span style="color:#3b82f6">LABS</span></span>
+          <img src="https://prymelabs.cc/logo-mark.png" alt="" width="20" height="22" style="vertical-align:middle;margin-right:8px" /><span style="color:#ffffff;font-size:22px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;vertical-align:middle">PRYME<span style="color:#3b82f6">LABS</span></span>
         </td></tr>
         <tr><td style="background:#12121f;padding:32px">
           <p style="color:#60a5fa;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin:0 0 8px">Announcement from ${store_name}</p>
@@ -184,7 +184,7 @@ ${preview_text ? `<span style="display:none;max-height:0;overflow:hidden">${prev
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
         <tr><td style="background:#12121f;border-radius:16px 16px 0 0;padding:28px 32px;border-bottom:1px solid #1e1e2e">
-          <span style="color:#ffffff;font-size:22px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase">PRYME<span style="color:#3b82f6">LABS</span></span>
+          <img src="https://prymelabs.cc/logo-mark.png" alt="" width="20" height="22" style="vertical-align:middle;margin-right:8px" /><span style="color:#ffffff;font-size:22px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;vertical-align:middle">PRYME<span style="color:#3b82f6">LABS</span></span>
         </td></tr>
         <tr><td style="background:#12121f;padding:32px">
           <p style="color:#60a5fa;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin:0 0 8px">Anuncio de ${store_name}</p>

@@ -31,7 +31,8 @@ function successPage(lang) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #09090b; color: #e4e4e7; font-family: Inter, Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
     .card { background: #12121f; border: 1px solid #1e1e2e; border-radius: 20px; max-width: 480px; width: 100%; padding: 40px 32px; text-align: center; }
-    .logo { font-size: 22px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 28px; }
+    .logo { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 22px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 28px; }
+    .logo img { height: 24px; width: auto; }
     .logo span { color: #3b82f6; }
     .icon { font-size: 48px; margin-bottom: 16px; }
     h1 { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 12px; }
@@ -45,7 +46,7 @@ function successPage(lang) {
 </head>
 <body>
   <div class="card">
-    <div class="logo">PRYME<span>LABS</span></div>
+    <div class="logo"><img src="https://prymelabs.cc/logo-mark.png" alt="" />PRYME<span>LABS</span></div>
     <div class="icon">✅</div>
     <h1>${es ? 'Suscripción Cancelada' : 'Successfully Unsubscribed'}</h1>
     <p>${es
@@ -79,7 +80,8 @@ function errorPage(msg) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #09090b; color: #e4e4e7; font-family: Inter, Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
     .card { background: #12121f; border: 1px solid #1e1e2e; border-radius: 20px; max-width: 480px; width: 100%; padding: 40px 32px; text-align: center; }
-    .logo { font-size: 22px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 28px; }
+    .logo { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 22px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 28px; }
+    .logo img { height: 24px; width: auto; }
     .logo span { color: #3b82f6; }
     .icon { font-size: 48px; margin-bottom: 16px; }
     h1 { font-size: 22px; font-weight: 800; color: #ef4444; margin-bottom: 12px; }
@@ -89,7 +91,7 @@ function errorPage(msg) {
 </head>
 <body>
   <div class="card">
-    <div class="logo">PRYME<span>LABS</span></div>
+    <div class="logo"><img src="https://prymelabs.cc/logo-mark.png" alt="" />PRYME<span>LABS</span></div>
     <div class="icon">⚠️</div>
     <h1>Invalid Link</h1>
     <p>${msg || 'This unsubscribe link is invalid or has already been used. Please contact support if you need help.'}</p>

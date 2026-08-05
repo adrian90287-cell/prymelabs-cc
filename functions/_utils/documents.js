@@ -106,7 +106,7 @@ export function orderReceiptHtml(order) {
   <!-- ── Header ── -->
   <div style="background:#0f172a;padding:28px 36px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
     <div>
-      <div style="color:#fff;font-size:22px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase">PRYME<span style="color:#3b82f6">LABS</span></div>
+      <div style="display:flex;align-items:center;gap:8px;color:#fff;font-size:22px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase"><img src="https://prymelabs.cc/logo-mark.png" alt="" style="height:22px;width:auto" />PRYME<span style="color:#3b82f6">LABS</span></div>
       <div style="color:#64748b;font-size:12px;margin-top:3px">prymelabs.cc · support@prymelabs.net · (346) 550-9100</div>
     </div>
     <div style="text-align:right">
@@ -258,7 +258,7 @@ export function statusUpdateHtml(order, newStatus, tracking = null) {
   <!-- ── Header ── -->
   <div style="background:#0f172a;padding:26px 36px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
     <div>
-      <div style="color:#fff;font-size:22px;font-weight:900;letter-spacing:0.1em">PRYME<span style="color:#3b82f6">LABS</span></div>
+      <div style="display:flex;align-items:center;gap:8px;color:#fff;font-size:22px;font-weight:900;letter-spacing:0.1em"><img src="https://prymelabs.cc/logo-mark.png" alt="" style="height:22px;width:auto" />PRYME<span style="color:#3b82f6">LABS</span></div>
       <div style="color:#64748b;font-size:12px;margin-top:3px">prymelabs.cc · support@prymelabs.net</div>
     </div>
     <div style="text-align:right">
@@ -382,7 +382,7 @@ export function subscriberRecordHtml(user) {
 <div style="max-width:500px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08)">
 
   <div style="background:#0f172a;padding:22px 30px;display:flex;justify-content:space-between;align-items:center">
-    <div style="color:#fff;font-size:18px;font-weight:900;letter-spacing:0.1em">PRYME<span style="color:#3b82f6">LABS</span></div>
+    <div style="display:flex;align-items:center;gap:7px;color:#fff;font-size:18px;font-weight:900;letter-spacing:0.1em"><img src="https://prymelabs.cc/logo-mark.png" alt="" style="height:18px;width:auto" />PRYME<span style="color:#3b82f6">LABS</span></div>
     <div style="color:#64748b;font-size:12px">Subscriber Record</div>
   </div>
 
@@ -508,7 +508,7 @@ export function taxRecordHtml(order) {
   <!-- ── Header ── -->
   <div style="background:#0f172a;padding:26px 36px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
     <div>
-      <div style="color:#fff;font-size:20px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase">PRYME<span style="color:#3b82f6">LABS</span></div>
+      <div style="display:flex;align-items:center;gap:7px;color:#fff;font-size:20px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase"><img src="https://prymelabs.cc/logo-mark.png" alt="" style="height:20px;width:auto" />PRYME<span style="color:#3b82f6">LABS</span></div>
       <div style="color:#64748b;font-size:12px;margin-top:3px">prymelabs.cc · support@prymelabs.net</div>
     </div>
     <div style="text-align:right">

@@ -20,7 +20,7 @@ function page({ title, heading, message, accent = '#002b63', button }) {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f9;"><tr><td align="center" style="padding:40px 16px;">
     <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #d9dde5;border-radius:6px;overflow:hidden;">
       <tr><td style="padding:28px 32px 14px;">
-        <div style="font-size:26px;font-weight:800;letter-spacing:2px;color:#111111;">PRYME<span style="color:#4f7fd9;">LABS</span></div>
+        <div style="font-size:26px;font-weight:800;letter-spacing:2px;color:#111111;"><img src="https://prymelabs.cc/logo-mark-email.png" alt="" width="20" height="21" style="vertical-align:middle;margin-right:7px" />PRYME<span style="color:#4f7fd9;">LABS</span></div>
         <div style="border-top:3px solid ${accent};width:60px;margin-top:12px;"></div>
       </td></tr>
       <tr><td style="padding:8px 32px 32px;">
