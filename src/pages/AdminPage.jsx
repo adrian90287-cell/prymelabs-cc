@@ -1958,6 +1958,8 @@ function InventoryTab() {
   const [bulkAmount, setBulkAmount] = useState('')
   const [bulkSign, setBulkSign] = useState('-')
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkSaleAmount, setBulkSaleAmount] = useState('')
+  const [bulkSaleBusy, setBulkSaleBusy] = useState(false)
   const adminToken = sessionStorage.getItem('pl_admin_token')
   const showToast = useToast()
 
@@ -2094,6 +2096,59 @@ function InventoryTab() {
       showToast('Bulk update failed', 'error')
     } finally {
       setBulkBusy(false)
+    }
+  }
+
+  // Set a manual per-product sale on every selected product: the current price
+  // becomes the "was" (compare_at_price), the new price is that minus the amount.
+  // Mirrors exactly what typing into the Price/Was fields on one product does —
+  // just applied to many at once.
+  const applyBulkSale = async () => {
+    const amt = Number(bulkSaleAmount)
+    if (!bulkSaleAmount || isNaN(amt) || amt <= 0) return
+    setBulkSaleBusy(true)
+    try {
+      const toUpdate = products.filter(p => selected.has(p.id))
+      await Promise.all(toUpdate.map(p => {
+        const was = Math.max(0.01, Number(p.price))
+        const price = Math.max(0.01, was - amt)
+        return fetch('/api/admin/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body: JSON.stringify({ ...p, price, compare_at_price: was }),
+        })
+      }))
+      showToast(`✓ Sale set for ${toUpdate.length} product${toUpdate.length !== 1 ? 's' : ''}`)
+      setSelected(new Set())
+      setBulkSaleAmount('')
+      load()
+    } catch {
+      showToast('Bulk sale update failed', 'error')
+    } finally {
+      setBulkSaleBusy(false)
+    }
+  }
+
+  // Remove the manual "was" price from every selected product (does not touch
+  // the current price — a global department sale, if any, still applies as usual).
+  const clearBulkSale = async () => {
+    setBulkSaleBusy(true)
+    try {
+      const toUpdate = products.filter(p => selected.has(p.id))
+      await Promise.all(toUpdate.map(p =>
+        fetch('/api/admin/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body: JSON.stringify({ ...p, compare_at_price: null }),
+        })
+      ))
+      showToast(`✓ Sale cleared for ${toUpdate.length} product${toUpdate.length !== 1 ? 's' : ''}`)
+      setSelected(new Set())
+      load()
+    } catch {
+      showToast('Clear sale failed', 'error')
+    } finally {
+      setBulkSaleBusy(false)
     }
   }
 
@@ -2481,6 +2536,37 @@ function InventoryTab() {
             className="text-zinc-500 hover:text-white text-xs px-2 py-1 rounded transition-colors shrink-0">
             Clear selection
           </button>
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 flex-wrap bg-red-600/8 border border-red-600/25 rounded-xl px-4 py-3">
+          <span className="text-red-400 font-bold text-sm shrink-0">Run a sale on selection:</span>
+          <div className="flex items-center gap-2 flex-1 flex-wrap">
+            <span className="text-zinc-400 text-xs font-semibold">$ off current price:</span>
+            <div className="flex items-center gap-1">
+              <span className="text-zinc-400 font-bold">$</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="0.00"
+                value={bulkSaleAmount}
+                onChange={e => setBulkSaleAmount(e.target.value)}
+                className={inpSm + ' w-24 text-right'}
+              />
+            </div>
+            <button
+              onClick={applyBulkSale}
+              disabled={bulkSaleBusy || !bulkSaleAmount || Number(bulkSaleAmount) <= 0}
+              className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg disabled:opacity-40 transition-colors">
+              {bulkSaleBusy ? '…' : 'Set Sale'}
+            </button>
+            <button
+              onClick={clearBulkSale}
+              disabled={bulkSaleBusy}
+              className="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-bold rounded-lg disabled:opacity-40 transition-colors">
+              {bulkSaleBusy ? '…' : 'Clear Sale'}
+            </button>
+          </div>
+          <span className="text-zinc-500 text-xs shrink-0 max-w-[220px]">Sets each product's own "was" price to its current price, minus this amount.</span>
         </div>
       )}
 
