@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
   const login = (tokenValue, userValue) => {
     localStorage.setItem('pl_token', tokenValue)
     localStorage.setItem('pl_user', JSON.stringify(userValue))
+    sessionStorage.removeItem('pl_peptide_ack')
     setToken(tokenValue)
     setUser(userValue)
     // Sync language preference from server on login
@@ -55,6 +56,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('pl_token')
     localStorage.removeItem('pl_user')
+    sessionStorage.removeItem('pl_peptide_ack')
     setToken(null)
     setUser(null)
   }
