@@ -33,7 +33,7 @@ export const translations = {
     },
     home: {
       eyebrow: 'Research-Grade · Third-Party Tested',
-      tagline: 'Premium research peptides, skin-care actives, and supplements — purity you can verify, shipped fast and discreet.',
+      tagline: 'Verified-purity supplements and skincare. Shipped fast, discreetly. Research-grade peptides, too.',
       browse: 'Browse Products',
       fullCatalog: 'Full Catalog →',
       pills: { coa: 'Premium Quality', shipping: 'Fast Discreet Shipping', checkout: 'Secure Checkout', reviews: 'Verified Reviews' },
@@ -341,7 +341,7 @@ export const translations = {
     },
     home: {
       eyebrow: 'Grado de Investigación · Probado por Terceros',
-      tagline: 'Péptidos de investigación premium, activos para el cuidado de la piel y suplementos — pureza que puedes verificar, con envío rápido y discreto.',
+      tagline: 'Suplementos y cuidado de la piel de pureza verificada. Envío rápido y discreto. También péptidos de grado de investigación.',
       browse: 'Ver Productos',
       fullCatalog: 'Catálogo Completo →',
       pills: { coa: 'Calidad Premium', shipping: 'Envío Rápido y Discreto', checkout: 'Pago Seguro', reviews: 'Reseñas Verificadas' },
