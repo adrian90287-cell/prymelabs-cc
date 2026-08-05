@@ -68,8 +68,8 @@ export default function AgeGate() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950 px-4">
-      <div className="w-full max-w-md text-center">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950 px-4 py-8">
+      <div className="w-full max-w-md mx-auto my-auto text-center min-h-full flex flex-col justify-center">
         <div className="mb-10">
           <h1 className="text-5xl font-black text-white tracking-widest">
             PRYME<span className="text-blue-500">LABS</span>
@@ -77,7 +77,7 @@ export default function AgeGate() {
           <div className="w-20 h-1 bg-blue-600 mx-auto mt-3 rounded-full" />
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <div className="flex justify-end mb-4">
             <LangToggle />
           </div>

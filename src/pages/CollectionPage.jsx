@@ -23,6 +23,16 @@ const DEPT_HERO = {
   'Beauty & Grooming':  '/hero/beauty.jpg',
 }
 
+// Where the actual subject sits in each source photo (as a CSS object-position),
+// so cropping into the short, wide banner box keeps it centered instead of
+// showing empty background. wellness.jpg in particular is a tall portrait crop
+// with its capsules well below center.
+const DEPT_HERO_POSITION = {
+  'Peptides':          'center 60%',
+  'Health & Wellness':  'center 62%',
+  'Beauty & Grooming':  'center 70%',
+}
+
 export default function CollectionPage() {
   const { deptSlug, colSlug } = useParams()
   const navigate = useNavigate()
@@ -120,7 +130,8 @@ export default function CollectionPage() {
         {/* Section title — banner photo behind the department name */}
         {DEPT_HERO[department] ? (
           <div className="relative overflow-hidden rounded-2xl border border-zinc-800 mb-6 h-56 sm:h-80">
-            <img src={DEPT_HERO[department]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={DEPT_HERO[department]} alt="" className="absolute inset-0 h-full w-full object-cover"
+              style={{ objectPosition: DEPT_HERO_POSITION[department] || 'center' }} />
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/35 to-transparent" />
             <div className="relative h-full flex flex-col justify-end p-4 sm:p-6">
               <h1 className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{collection ? colName : deptName}</h1>
