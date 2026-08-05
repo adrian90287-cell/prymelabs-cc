@@ -29,8 +29,12 @@ async function verifyJWT(token, secret) {
   if (parts.length !== 3) throw new Error('Invalid token');
 
   const msg = parts[0] + '.' + parts[1];
+  // Imported for 'sign' (not 'verify') — we recompute the expected signature
+  // via .sign() and compare, never call subtle.verify(). 'verify' usage here
+  // previously made .sign() produce a different signature in this runtime,
+  // so every legitimately valid token failed verification.
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 
   const expectedSig = base64url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
   // Use constant-time comparison to prevent timing attacks
@@ -57,10 +61,15 @@ export async function onRequest({ request, env }) {
 async function handleVerify(request, env) {
   try {
     // User confirms they are 21+
+    if (!env.JWT_SECRET) {
+      return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
+    }
     const token = await signJWT({
       ageVerified: true,
       verifiedAt: new Date().toISOString()
-    }, env.JWT_SECRET || 'dev-secret-key');
+    }, env.JWT_SECRET);
 
     return new Response(JSON.stringify({
       token,
@@ -86,11 +95,11 @@ async function handleCheck(request, env) {
     const auth = request.headers.get('Authorization') || '';
     const token = auth.replace('Bearer ', '');
 
-    if (!token) {
+    if (!token || !env.JWT_SECRET) {
       return new Response(JSON.stringify({ verified: false }), { status: 200 });
     }
 
-    const payload = await verifyJWT(token, env.JWT_SECRET || 'dev-secret-key');
+    const payload = await verifyJWT(token, env.JWT_SECRET);
 
     if (payload.ageVerified !== true) {
       return new Response(JSON.stringify({ verified: false }), { status: 200 });

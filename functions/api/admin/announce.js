@@ -1,6 +1,7 @@
 import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
 import { sendEmail } from '../../_utils/email.js'
+import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js'
 
 
 // Generate per-user HMAC-SHA256 unsubscribe token
@@ -38,6 +39,11 @@ async function translateToSpanish(env, text) {
 
 export async function onRequestPost({ request, env }) {
   if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+
+  // Mass broadcast + a metered Workers AI translation call — throttle
+  // independently of login rate limiting.
+  const rl = await checkAdminRateLimit(env, adminRateLimitKey(request, 'ai-generate'))
+  if (rl.blocked) return json({ error: `Too many requests. Try again in ${Math.ceil(rl.retryAfter)}s.` }, 429)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
@@ -121,7 +127,8 @@ function esc(s) {
 }
 
 function buildAnnouncementHtml({ subject, message, preview_text, image_url, store_name, unsubUrl, name }) {
-  const msgHtml = message.replace(/\n/g, '<br>')
+  const msgHtml = esc(message).replace(/\n/g, '<br>')
+  subject = esc(subject)
   const imageBlock = image_url
     ? `<div style="margin-bottom:24px;border-radius:12px;overflow:hidden"><a href="https://prymelabs.cc/shop" target="_blank" style="display:block;text-decoration:none"><img src="${image_url}" alt="" style="width:100%;max-width:600px;display:block;border-radius:12px;border:0" /></a></div>`
     : ''
@@ -169,7 +176,8 @@ ${preview_text ? `<span style="display:none;max-height:0;overflow:hidden">${prev
 }
 
 function buildAnnouncementHtmlEs({ subject, message, preview_text, image_url, store_name, unsubUrl, name }) {
-  const msgHtml = message.replace(/\n/g, '<br>')
+  const msgHtml = esc(message).replace(/\n/g, '<br>')
+  subject = esc(subject)
   const imageBlock = image_url
     ? `<div style="margin-bottom:24px;border-radius:12px;overflow:hidden"><a href="https://prymelabs.cc/shop" target="_blank" style="display:block;text-decoration:none"><img src="${image_url}" alt="" style="width:100%;max-width:600px;display:block;border-radius:12px;border:0" /></a></div>`
     : ''

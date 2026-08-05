@@ -1,5 +1,6 @@
 import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
+import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js'
 
 
 async function translateToSpanish(env, text) {
@@ -23,6 +24,11 @@ async function translateToSpanish(env, text) {
 
 export async function onRequestPost({ request, env }) {
   if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+
+  // Runs one Workers AI call per product missing a translation — throttle
+  // repeat invocations of this endpoint independently of login rate limiting.
+  const rl = await checkAdminRateLimit(env, adminRateLimitKey(request, 'ai-generate'))
+  if (rl.blocked) return json({ error: `Too many requests. Try again in ${Math.ceil(rl.retryAfter)}s.` }, 429)
 
   // Fetch all products missing a Spanish description
   const { results: products } = await env.DB.prepare(

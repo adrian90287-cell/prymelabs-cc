@@ -1,9 +1,15 @@
 import { adminAuth } from '../../_utils/legacyAdminAuth.js'
 import { corsHeaders, json } from '../../_utils/cors.js'
+import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js'
 
 
 export async function onRequestPost({ request, env }) {
   if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
+
+  // Metered Workers AI call — throttle independently of login rate limiting
+  // so a leaked/abused session can't drive unbounded AI spend.
+  const rl = await checkAdminRateLimit(env, adminRateLimitKey(request, 'ai-generate'))
+  if (rl.blocked) return json({ error: `Too many requests. Try again in ${Math.ceil(rl.retryAfter)}s.` }, 429)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

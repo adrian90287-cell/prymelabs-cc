@@ -39,9 +39,14 @@ export async function verifyAdminToken(request, env) {
   if (!token) {
     return { valid: false, error: 'Missing authorization token' };
   }
+  if (!env.JWT_SECRET) {
+    // Fail closed — signing/verifying with a hardcoded fallback would let
+    // anyone forge an admin token offline if this secret is ever unset.
+    return { valid: false, error: 'Server misconfigured' };
+  }
 
   try {
-    const payload = await verifyJWT(token, env.JWT_SECRET || 'dev-secret-key');
+    const payload = await verifyJWT(token, env.JWT_SECRET);
     // Customer JWTs (functions/_utils/jwt.js) are signed with this same
     // JWT_SECRET, so signature validity alone isn't enough — without this
     // check, any logged-in customer's own token would pass as a valid admin

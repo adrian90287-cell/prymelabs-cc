@@ -267,7 +267,7 @@ function EasyPostPanel({ order, onRefresh, onClose, reship = false }) {
   const [label, setLabel]       = useState(null)
   const [busy, setBusy]         = useState(false)
   const [err, setErr]           = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin') || localStorage.getItem('pl_admin_pw')
+  const adminToken = sessionStorage.getItem('pl_admin')
   const showToast  = useToast()
 
   // Editable ship-to address — expanded by default when reshipping so the admin
@@ -1782,7 +1782,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               try {
                 const res = await fetch('/api/admin/generate-description', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${(sessionStorage.getItem('pl_admin') || localStorage.getItem('pl_admin_pw'))}` },
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${sessionStorage.getItem('pl_admin')}` },
                   body: JSON.stringify({ name: form.name, category: form.category, size: form.size, department: form.department, field: 'tagline' }),
                 })
                 const data = await res.json()
@@ -1839,7 +1839,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               try {
                 const res = await fetch('/api/admin/generate-description', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${(sessionStorage.getItem('pl_admin') || localStorage.getItem('pl_admin_pw'))}` },
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${sessionStorage.getItem('pl_admin')}` },
                   body: JSON.stringify({ name: form.name, category: form.category, size: form.size, department: form.department }),
                 })
                 const data = await res.json()
@@ -6009,7 +6009,7 @@ export default function AdminPage() {
   }, [])
 
   const enablePush = useCallback(async () => {
-    const token = (sessionStorage.getItem('pl_admin') || localStorage.getItem('pl_admin_pw'))
+    const token = sessionStorage.getItem('pl_admin')
     if (!token) return
     setPushState('loading')
     try {
@@ -6043,7 +6043,7 @@ export default function AdminPage() {
   }, [])
 
   const disablePush = useCallback(async () => {
-    const token = (sessionStorage.getItem('pl_admin') || localStorage.getItem('pl_admin_pw'))
+    const token = sessionStorage.getItem('pl_admin')
     try {
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()

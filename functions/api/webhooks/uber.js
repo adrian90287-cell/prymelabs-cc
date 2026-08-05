@@ -1,13 +1,46 @@
 import { json } from '../../_utils/cors.js'
 import { sendEmail, sendSMS } from '../../_utils/email.js'
 
-// Uber Direct webhook — receives delivery status updates
-// Uber sends POST requests with delivery event payloads
-// No auth header needed; we verify via delivery_id matching an order in our DB
+// Uber Direct webhook — receives delivery status updates.
+// Uber signs each request with an HMAC-SHA256 of the raw body, hex-encoded,
+// in the X-Uber-Signature header (Customer Notifications API, same shape as
+// EasyPost's webhook — see webhooks/easypost.js). We verify it before trusting
+// any status change, since an unverified endpoint would let anyone forge a
+// "delivered" or "cancelled" event for a guessed/leaked delivery_id.
+
+// Constant-time string comparison to avoid signature timing leaks
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+async function verifySignature(secret, rawBodyBytes, signatureHeader) {
+  if (!secret || !signatureHeader) return false
+  const keyData = new TextEncoder().encode(secret)
+  const key = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const sigBuf = await crypto.subtle.sign('HMAC', key, rawBodyBytes)
+  const hex = [...new Uint8Array(sigBuf)].map(b => b.toString(16).padStart(2, '0')).join('')
+  return timingSafeEqual(hex, signatureHeader)
+}
 
 export async function onRequestPost({ request, env, waitUntil }) {
+  // Read raw bytes once — needed for both the signature check and JSON parse
+  const rawBody = await request.arrayBuffer()
+
+  // ── Verify the request genuinely came from Uber ──
+  const secret = env.UBER_WEBHOOK_SECRET
+  if (!secret) {
+    // Secret not configured yet — refuse rather than process unverified events
+    return json({ error: 'Webhook secret not configured' }, 503)
+  }
+  const signature = request.headers.get('X-Uber-Signature') || request.headers.get('x-uber-signature')
+  const valid = await verifySignature(secret, rawBody, signature)
+  if (!valid) return json({ error: 'Invalid signature' }, 401)
+
   let body
-  try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
+  try { body = JSON.parse(new TextDecoder().decode(rawBody)) } catch { return json({ error: 'Invalid JSON' }, 400) }
 
   // Uber webhook payload shape:
   // { kind: 'eats.delivery_status', data: { id, status, tracking_url, courier: { name, phone, ... }, ... } }
@@ -40,9 +73,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
   // Map Uber statuses
   // pending → assigned → en_route_to_pickup → arrived_at_pickup → en_route_to_dropoff → arrived_at_dropoff → delivered | cancelled | returned
   if (['delivered'].includes(status)) {
-    await env.DB.prepare(
-      `UPDATE orders SET status = 'completed', delivered_at = ?, tracking_json = ? WHERE id = ?`
+    // Guard against replayed webhook deliveries re-sending the "delivered"
+    // notification — only fire once, on the transition into completed.
+    const res = await env.DB.prepare(
+      `UPDATE orders SET status = 'completed', delivered_at = ?, tracking_json = ? WHERE id = ? AND status != 'completed'`
     ).bind(now, JSON.stringify({ ...tracking, uber_status: status }), order.id).run()
+    if (!res.meta.changes) return json({ ok: true, ignored: 'already_completed' })
 
     const shipping  = JSON.parse(order.shipping_json || '{}')
     const firstName = (order.customer_name || '').split(' ')[0]

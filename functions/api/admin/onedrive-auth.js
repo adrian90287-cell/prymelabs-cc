@@ -7,15 +7,25 @@ import { adminAuth } from '../../_utils/legacyAdminAuth.js'
  * DELETE /api/admin/onedrive-auth        → disconnect (remove stored token)
  */
 import { corsHeaders, json } from '../../_utils/cors.js'
-import { buildAuthUrl, exchangeCodeAndStore } from '../../_utils/onedrive.js'
+import { buildAuthUrl, exchangeCodeAndStore, generateOAuthState, verifyAndConsumeOAuthState } from '../../_utils/onedrive.js'
 
 
 export async function onRequestGet({ request, env }) {
-  const url  = new URL(request.url)
-  const code = url.searchParams.get('code')
+  const url   = new URL(request.url)
+  const code  = url.searchParams.get('code')
+  const state = url.searchParams.get('state')
 
-  // ── OAuth callback (Microsoft redirects here with ?code=) ─────────────────
+  // ── OAuth callback (Microsoft redirects here with ?code=&state=) ──────────
   if (code) {
+    // Reject unless the state matches a flow we ourselves started — otherwise
+    // anyone could feed an admin their own authorization code and hijack
+    // where OneDrive uploads (order receipts) end up going.
+    if (!await verifyAndConsumeOAuthState(env, state)) {
+      return new Response(null, {
+        status: 302,
+        headers: { Location: '/admin?onedrive=error&msg=' + encodeURIComponent('Invalid or expired authorization request') },
+      })
+    }
     const redirectUri = `${url.origin}/api/admin/onedrive-auth`
     const result = await exchangeCodeAndStore(env, { code, redirectUri })
     const dest = result.ok
@@ -32,7 +42,8 @@ export async function onRequestGet({ request, env }) {
   }
 
   const redirectUri = `${url.origin}/api/admin/onedrive-auth`
-  return json({ auth_url: buildAuthUrl(env.ONEDRIVE_CLIENT_ID, redirectUri) })
+  const oauthState = await generateOAuthState(env)
+  return json({ auth_url: buildAuthUrl(env.ONEDRIVE_CLIENT_ID, redirectUri, oauthState) })
 }
 
 export async function onRequestDelete({ request, env }) {

@@ -4,10 +4,23 @@
 // without depending on the client keeping two separate credentials in sync.
 import { verifyAdminToken } from './adminAuth.js';
 import { constantTimeCompare } from './constantTime.js';
+import { checkAdminRateLimit, adminRateLimitKey } from './adminRateLimit.js';
 
 export async function adminAuth(request, env) {
-  const auth = request.headers.get('Authorization') || '';
-  if (constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`)) return true;
+  // A valid JWT (the common case for an already-logged-in admin) never touches
+  // the rate limiter below — only requests that fall back to the legacy
+  // password scheme do, so normal admin usage is never throttled.
   const result = await verifyAdminToken(request, env);
-  return result.valid;
+  if (result.valid) return true;
+
+  // Below this point we're either brute-forcing the legacy password or
+  // legitimately using it — throttle per-IP before even comparing, since
+  // this helper is shared by every endpoint that still accepts it and
+  // previously had no rate limiting of its own.
+  const rl = await checkAdminRateLimit(env, adminRateLimitKey(request, 'legacy-auth'));
+  if (rl.blocked) return false;
+
+  if (!env.ADMIN_PASSWORD) return false; // fail closed if unset, not "admin:undefined"
+  const auth = request.headers.get('Authorization') || '';
+  return constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`);
 }

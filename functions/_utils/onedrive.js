@@ -98,7 +98,7 @@ export async function downloadFromOneDrive(env, { folderPath, filename }) {
 }
 
 /** Build the Microsoft OAuth authorization URL */
-export function buildAuthUrl(clientId, redirectUri) {
+export function buildAuthUrl(clientId, redirectUri, state) {
   const params = new URLSearchParams({
     client_id:     clientId,
     response_type: 'code',
@@ -106,8 +106,42 @@ export function buildAuthUrl(clientId, redirectUri) {
     scope:         SCOPES,
     response_mode: 'query',
     prompt:        'select_account',
+    state,
   })
   return `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?${params}`
+}
+
+// ── OAuth CSRF protection ───────────────────────────────────────────────────
+// The callback (GET /api/admin/onedrive-auth?code=...) is a plain browser
+// redirect Microsoft sends — it carries no admin auth header, so without a
+// state check anyone could start their own OAuth flow with our client_id and
+// trick an admin into completing it, silently redirecting future OneDrive
+// uploads (order receipts — PII) to the attacker's account. A one-time,
+// short-lived state value tied to the admin-initiated request closes that.
+
+/** Generate and store a one-time OAuth state, tied to the admin who requested it */
+export async function generateOAuthState(env) {
+  const state = crypto.randomUUID()
+  const expiresAt = Date.now() + 5 * 60 * 1000 // 5 minutes to complete the flow
+  await env.DB.prepare(
+    "INSERT OR REPLACE INTO settings (key, value) VALUES ('onedrive_oauth_state', ?)"
+  ).bind(JSON.stringify({ state, expiresAt })).run()
+  return state
+}
+
+/** Verify the callback's state matches what we issued, then burn it (single-use) */
+export async function verifyAndConsumeOAuthState(env, state) {
+  const row = await env.DB.prepare(
+    "SELECT value FROM settings WHERE key = 'onedrive_oauth_state'"
+  ).first()
+  await env.DB.prepare("DELETE FROM settings WHERE key = 'onedrive_oauth_state'").run()
+  if (!row?.value || !state) return false
+  try {
+    const { state: expected, expiresAt } = JSON.parse(row.value)
+    return expected === state && Date.now() < expiresAt
+  } catch {
+    return false
+  }
 }
 
 /** Exchange authorization code for tokens and store refresh token in D1 */

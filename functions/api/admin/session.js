@@ -2,6 +2,7 @@
 // Simple JWT implementation using Web Crypto API (no external dependencies)
 import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js';
 import { verifyTOTP } from '../../_utils/totpCore.js';
+import { constantTimeCompare } from '../../_utils/constantTime.js';
 
 function base64url(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -31,11 +32,16 @@ async function verifyJWT(token, secret) {
   if (parts.length !== 3) throw new Error('Invalid token');
 
   const msg = parts[0] + '.' + parts[1];
+  // NOTE: imported for 'sign' (not 'verify') even though this function verifies —
+  // we recompute the expected signature ourselves via .sign() and compare, we
+  // never call subtle.verify(). Importing with 'verify' usage here previously
+  // made this key produce a different (wrong) signature under .sign() in this
+  // runtime, so every legitimately valid token failed verification.
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 
   const expectedSig = base64url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
-  if (expectedSig !== parts[2]) throw new Error('Invalid signature');
+  if (!constantTimeCompare(expectedSig, parts[2])) throw new Error('Invalid signature');
 
   const payload = JSON.parse(new TextDecoder().decode(
     Uint8Array.from(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
@@ -60,8 +66,15 @@ export async function onRequest({ request, env }) {
 
 async function handleLogin(request, env) {
   try {
+    if (!env.JWT_SECRET) {
+      // Fail closed — a hardcoded fallback secret would let anyone forge an
+      // admin token offline if this Cloudflare secret is ever unset.
+      return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
+    }
     const body = await request.json();
-    const secret = env.JWT_SECRET || 'dev-secret-key';
+    const secret = env.JWT_SECRET;
 
     // ── Step 2: completing a pending 2FA login (password already verified) ──
     if (body.pendingToken && body.code) {
@@ -115,7 +128,7 @@ async function handleLogin(request, env) {
       });
     }
 
-    if (password !== env.ADMIN_PASSWORD) {
+    if (!env.ADMIN_PASSWORD || typeof password !== 'string' || !constantTimeCompare(password, env.ADMIN_PASSWORD)) {
       return new Response(JSON.stringify({ error: 'Invalid password' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
@@ -154,8 +167,11 @@ async function handleVerify(request, env) {
     if (!token) {
       return new Response(JSON.stringify({ valid: false }), { status: 401 });
     }
+    if (!env.JWT_SECRET) {
+      return new Response(JSON.stringify({ valid: false, error: 'Server misconfigured' }), { status: 500 });
+    }
 
-    await verifyJWT(token, env.JWT_SECRET || 'dev-secret-key');
+    await verifyJWT(token, env.JWT_SECRET);
 
     return new Response(JSON.stringify({
       valid: true,
