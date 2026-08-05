@@ -56,8 +56,10 @@ export async function onRequestGet({ request, env }) {
       const ownWas = Number(p.compare_at_price);
       if (ownWas && ownWas > price) compare_at_price = ownWas;
     } else {
-      // 1. master price adjust  2. per-department sale  3. was-amount override
+      // 1. manual "was" price (base)  2. per-department sale (override)  3. was-amount override
       price = Math.max(0.01, Number(p.price) + masterAdjust);
+      const ownWas = Number(p.compare_at_price);
+      if (ownWas && ownWas > price) compare_at_price = ownWas;
       const saleAmt = saleAmountForDept(saleConfig, p.department);
       if (saleAmt > 0) {
         compare_at_price = price;
