@@ -111,7 +111,6 @@ export default function HomePage() {
           <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tight leading-[0.95]">
             PRYME<span className="text-blue-500">LABS</span>
           </h1>
-          <img src="/tagline.png" alt="Elevate Your Natural Energy" className="h-6 sm:h-7 w-auto mx-auto mt-3" />
           <p className="mt-5 text-zinc-400 text-base sm:text-xl max-w-2xl mx-auto leading-relaxed">
             {t.home.tagline}
           </p>
