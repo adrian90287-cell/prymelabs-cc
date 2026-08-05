@@ -19,7 +19,7 @@ export default function PeptideGate({ onAgree, onDecline }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/95 backdrop-blur-sm px-4 py-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/95 backdrop-blur-sm px-4 py-8" data-build="cache-bust-1">
       <div className="w-full max-w-lg mx-auto my-auto min-h-full flex flex-col justify-center">
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl max-h-full overflow-y-auto">
           <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto mb-5 shrink-0">

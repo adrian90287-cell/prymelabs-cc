@@ -68,7 +68,7 @@ export default function AuthPage() {
   const inp = 'w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-sm'
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="min-h-screen bg-zinc-950 flex flex-col" data-build="cache-bust-1">
       <div className="absolute top-4 right-4 z-10 flex rounded-lg overflow-hidden border border-zinc-800">
         {['en', 'es'].map(l => (
           <button key={l} onClick={() => setLanguage(l)}
