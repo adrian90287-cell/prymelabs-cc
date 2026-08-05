@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import { taggableCollections, productCollections } from '../lib/collections'
+import { computeDisplayPricing } from '../../functions/_utils/pricing.js'
+import { resolveSaleConfig, saleAmountForDept } from '../../functions/_utils/sale.js'
 
 // ─── Toast System ─────────────────────────────────────────────────────────────
 
@@ -2147,30 +2149,15 @@ function InventoryTab() {
   }
 
   // Compute the effective (customer-facing) price for a product given current master controls
+  // — same shared logic the storefront API uses, so this preview can't drift out of sync.
   const computeEffective = (p) => {
-    // Cases / wholesale items are fixed-price — exempt from every global adjustment,
-    // but keep their own manually-set "was" price so the saving still shows.
-    if (p.no_discount === 1 || p.bundle_of_product_id != null) {
-      const price = Math.max(0.01, Number(p.price))
-      const ownWas = Number(p.compare_at_price)
-      return { price, was: (ownWas && ownWas > price) ? ownWas : null }
-    }
-    const adj = Number(masterAdjust) || 0
-    let price = Math.max(0.01, Number(p.price) + adj)
-    let was = p.compare_at_price ? Number(p.compare_at_price) : null
-
-    const saleAmt = Number(saleAmounts[deptOf(p)]) || 0
-    if (saleAmt > 0) {
-      was = price
-      price = Math.max(0.01, price - saleAmt)
-    }
-
-    const wasPlusAmt = Number(wasAmount) || 0
-    if (wasAmountEnabled && wasPlusAmt > 0) {
-      was = price + wasPlusAmt
-    }
-
-    return { price, was }
+    const { price, compare_at_price } = computeDisplayPricing(p, {
+      masterAdjust: Number(masterAdjust) || 0,
+      saleConfig: saleAmounts,
+      wasAmountEnabled,
+      wasAmount: Number(wasAmount) || 0,
+    })
+    return { price, was: compare_at_price }
   }
 
   const anySaleActive = Object.values(saleAmounts).some(a => Number(a) > 0)
@@ -5498,7 +5485,7 @@ function WillCallTab({ onOrderCreated }) {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   // pricing knobs mirrored from settings so the preview matches the charged total
-  const [cfg, setCfg] = useState({ saleEnabled: false, saleDiscount: 0, saleDepts: null, masterAdjust: 0, taxRate: 0 })
+  const [cfg, setCfg] = useState({ saleConfig: {}, masterAdjust: 0, taxRate: 0 })
   const [cart, setCart] = useState({}) // product_id -> { product, qty }
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -5544,14 +5531,8 @@ function WillCallTab({ onOrderCreated }) {
         const bannerOn = sd.settings?.banner_enabled === '1'
         const bannerCode = (sd.settings?.banner_code || '').toUpperCase().trim()
         if (bannerOn && bannerCode) { setActiveCode(bannerCode); setPromoInput(bannerCode) }
-        let saleDeptsList = null
-        if (typeof sd.settings?.sale_departments === 'string' && sd.settings.sale_departments.trim()) {
-          try { const a = JSON.parse(sd.settings.sale_departments); if (Array.isArray(a)) saleDeptsList = a } catch {}
-        }
         setCfg({
-          saleEnabled: sd.settings?.sale_mode_enabled === '1',
-          saleDiscount: Number(sd.settings?.sale_discount_amount) || 0,
-          saleDepts: saleDeptsList,
+          saleConfig: resolveSaleConfig(sd.settings || {}),
           masterAdjust: Number(sd.settings?.master_price_adjust) || 0,
           taxRate: Number(sd.settings?.tax_rate) || 0,
         })
@@ -5594,9 +5575,8 @@ function WillCallTab({ onOrderCreated }) {
     const noDiscount = p.no_discount === 1 || p.bundle_of_product_id != null
     if (noDiscount) return Math.max(0.01, Number(p.price))
     let price = Math.max(0.01, Number(p.price) + cfg.masterAdjust)
-    const dept = DEPARTMENTS.includes(p.department) ? p.department : 'Peptides'
-    const saleApplies = cfg.saleDepts === null || (Array.isArray(cfg.saleDepts) && cfg.saleDepts.includes(dept))
-    if (cfg.saleEnabled && cfg.saleDiscount > 0 && saleApplies) price = Math.max(0.01, price - cfg.saleDiscount)
+    const saleAmt = saleAmountForDept(cfg.saleConfig, p.department)
+    if (saleAmt > 0) price = Math.max(0.01, price - saleAmt)
     return Number(price.toFixed(2))
   }
 
