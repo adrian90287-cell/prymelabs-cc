@@ -1,6 +1,7 @@
 import { corsHeaders, json } from '../../_utils/cors.js';
 import { isContentAuthed } from '../../_utils/contentAuth.js';
-import { resolveSaleConfig, saleAmountForDept } from '../../_utils/sale.js';
+import { resolveSaleConfig } from '../../_utils/sale.js';
+import { computeDisplayPricing } from '../../_utils/pricing.js';
 
 export async function onRequestGet({ request, env }) {
   // Catalog + prices are gated — only logged-in customers (or admin) may read.
@@ -44,31 +45,9 @@ export async function onRequestGet({ request, env }) {
 
   const finalProducts = (products || []).map(p => {
     const isBundle = p.bundle_of_product_id != null;
-    // Cases (and any product flagged no_discount) are fixed wholesale price —
-    // exempt from master adjust, global sale, and the was-amount override.
-    const noDiscount = p.no_discount === 1 || isBundle;
-
-    let price, compare_at_price = null;
-    if (noDiscount) {
-      price = Math.max(0.01, Number(p.price));
-      // Fixed-price items skip the GLOBAL sale, but keep their OWN "was" price so
-      // a case can still show its wholesale saving (e.g. was $99, now $69).
-      const ownWas = Number(p.compare_at_price);
-      if (ownWas && ownWas > price) compare_at_price = ownWas;
-    } else {
-      // 1. manual "was" price (base)  2. per-department sale (override)  3. was-amount override
-      price = Math.max(0.01, Number(p.price) + masterAdjust);
-      const ownWas = Number(p.compare_at_price);
-      if (ownWas && ownWas > price) compare_at_price = ownWas;
-      const saleAmt = saleAmountForDept(saleConfig, p.department);
-      if (saleAmt > 0) {
-        compare_at_price = price;
-        price = Math.max(0.01, price - saleAmt);
-      }
-      if (wasAmountEnabled && wasAmount > 0) {
-        compare_at_price = price + wasAmount;
-      }
-    }
+    const { price, compare_at_price, no_discount: noDiscount } = computeDisplayPricing(p, {
+      masterAdjust, saleConfig, wasAmountEnabled, wasAmount,
+    });
 
     // A case's availability is derived from its parent's shared vial pool.
     let in_stock = p.in_stock;
