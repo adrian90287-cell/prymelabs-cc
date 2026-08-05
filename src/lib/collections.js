@@ -9,7 +9,7 @@
 //   • "New Arrivals" → the most recently added products in the department
 // Everything else (incl. Best Sellers, Bundles) is a manual tag set in admin.
 
-export const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Peptides']
+export const DEPARTMENTS = ['Peptides', 'Health & Wellness', 'Beauty & Grooming']
 
 // Per-department sub-collections, in menu order. "Shop All" is prepended in the
 // UI; "New Arrivals" is dynamic; the rest are tag-based.

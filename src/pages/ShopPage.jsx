@@ -7,7 +7,6 @@ import { useCart } from '../context/CartContext'
 import { useT } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { authHeaders } from '../lib/authHeaders'
-import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import {
   ProductModal, ProductGroupCard, groupByName,
   CATEGORY_ORDER, DEPARTMENTS, DEPARTMENT_META, departmentOf,
@@ -121,15 +120,8 @@ export default function ShopPage() {
   const [modal, setModal] = useState(null) // { group, variant }
   const [coaDocs, setCoaDocs] = useState([])
   const [showWasPrice, setShowWasPrice] = useState(true)
-  const [peptideAcked, setPeptideAcked] = useState(hasAckedPeptideGate())
   const { reconcilePrices } = useCart()
   const t = useT()
-
-  // Re-check whenever the department filter lands on Peptides — a login/logout
-  // since this page last mounted can have cleared the sessionStorage ack.
-  useEffect(() => {
-    if (department === 'Peptides') setPeptideAcked(hasAckedPeptideGate())
-  }, [department])
 
   useEffect(() => {
     fetch('/api/products', { headers: authHeaders() })
@@ -205,13 +197,6 @@ export default function ShopPage() {
           onClose={closeModal}
           coaDocs={coaDocs}
           showWasPrice={showWasPrice}
-        />
-      )}
-
-      {department === 'Peptides' && !peptideAcked && (
-        <PeptideGate
-          onAgree={() => setPeptideAcked(true)}
-          onDecline={() => selectDepartment('All')}
         />
       )}
 

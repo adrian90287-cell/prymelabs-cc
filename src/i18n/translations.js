@@ -11,18 +11,6 @@ export const translations = {
       notForHuman: 'Use Only as Directed',
       disclaimer: 'Pryme Labs offers research materials, supplements, and personal-care products. Research chemicals are strictly for laboratory use and not for human consumption. Use every product only as labeled — see our Compliance page for full terms.',
     },
-    peptideGate: {
-      title: 'Research Use Disclaimer',
-      intro: 'Before entering the Peptides department, please read and agree to the following:',
-      points: [
-        'Strictly for laboratory and research use only. NOT for human or animal consumption, therapeutic, diagnostic, or clinical use.',
-        'By continuing, you confirm you are a qualified researcher or professional purchasing for legitimate research purposes, and that you are 21 years or older.',
-        'No claims are made regarding safety or efficacy for human use. Sold as research reagents only.',
-        'Pryme Labs assumes no liability for misuse, mishandling, or use of these products in any manner inconsistent with their labeling as research chemicals.',
-      ],
-      agree: 'I Understand & Agree — Enter',
-      decline: 'Go Back',
-    },
     nav: {
       home: 'Home',
       shop: 'Shop',
@@ -318,18 +306,6 @@ export const translations = {
       researchOnly: 'Solo Mayores de 21',
       notForHuman: 'Usar Según las Indicaciones',
       disclaimer: 'Pryme Labs ofrece materiales de investigación, suplementos y productos de cuidado personal. Los químicos de investigación son estrictamente para uso de laboratorio y no para consumo humano. Use cada producto solo según su etiqueta — consulte nuestra página de Cumplimiento para los términos completos.',
-    },
-    peptideGate: {
-      title: 'Aviso de Uso en Investigación',
-      intro: 'Antes de ingresar al departamento de Péptidos, lea y acepte lo siguiente:',
-      points: [
-        'Estrictamente para uso de laboratorio e investigación. NO para consumo humano o animal, ni uso terapéutico, diagnóstico o clínico.',
-        'Al continuar, confirma que es un investigador o profesional calificado que compra con fines de investigación legítimos, y que tiene 21 años o más.',
-        'No se hacen declaraciones sobre la seguridad o eficacia para uso humano. Se vende únicamente como reactivo de investigación.',
-        'Pryme Labs no asume responsabilidad alguna por el mal uso, manejo inadecuado, o uso de estos productos de manera inconsistente con su etiquetado como químicos de investigación.',
-      ],
-      agree: 'Entiendo y Acepto — Entrar',
-      decline: 'Regresar',
     },
     nav: {
       home: 'Inicio',

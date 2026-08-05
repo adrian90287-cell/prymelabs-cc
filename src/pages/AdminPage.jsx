@@ -102,7 +102,7 @@ function carrierLink(carrier, number) {
   return fn && number ? fn(number) : null
 }
 // Top-level storefront departments — drive the home-page tabs (see migrate_v22.sql)
-const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Peptides']
+const DEPARTMENTS = ['Peptides', 'Health & Wellness', 'Beauty & Grooming']
 // Categories offered per department in the product form (the storefront sub-filter).
 const CATEGORIES_BY_DEPT = {
   'Peptides': ['GLP Research', 'Recovery & Repair', 'Longevity Research', 'Neural & Cognitive', 'Peptide Hormones', 'Research Supplies'],

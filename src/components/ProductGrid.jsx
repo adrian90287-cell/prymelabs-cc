@@ -3,7 +3,7 @@ import { useCart } from '../context/CartContext'
 import { useT } from '../context/LanguageContext'
 
 // ── Storefront departments (home-page tabs) ──────────────────────────────────
-export const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Peptides']
+export const DEPARTMENTS = ['Peptides', 'Health & Wellness', 'Beauty & Grooming']
 export const DEPARTMENT_META = {
   'Peptides':          { icon: '🧬', blurb: 'Research peptides, GLP analogs & recovery compounds' },
   'Health & Wellness': { icon: '💊', blurb: 'Daily wellness, hydration, recovery & performance' },
