@@ -92,7 +92,16 @@ export default function HomePage() {
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-zinc-800/60">
+        {/* Background photo — our research bench, representing the full catalog */}
         <div className="pointer-events-none absolute inset-0">
+          <img
+            src="/hero/main-lab-sm.jpg"
+            srcSet="/hero/main-lab-sm.jpg 900w, /hero/main-lab.jpg 2200w"
+            sizes="100vw"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-[center_30%] opacity-[0.55]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/50 via-zinc-950/75 to-zinc-950" />
           <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[680px] h-[680px] rounded-full bg-blue-600/15 blur-[120px]" />
           <div className="absolute top-40 -right-20 w-[380px] h-[380px] rounded-full bg-indigo-500/10 blur-[100px]" />
         </div>

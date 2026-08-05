@@ -15,6 +15,13 @@ import {
 
 const inStock = (p) => p.in_stock !== 0 && p.in_stock !== false
 
+// Department landing hero photo, shown behind the department name.
+const DEPT_HERO = {
+  'Peptides':          '/hero/peptides.jpg',
+  'Health & Wellness':  '/hero/wellness.jpg',
+  'Beauty & Grooming':  '/hero/beauty.jpg',
+}
+
 export default function CollectionPage() {
   const { deptSlug, colSlug } = useParams()
   const navigate = useNavigate()
@@ -89,13 +96,26 @@ export default function CollectionPage() {
           </button>
         )}
 
-        {/* Section title */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-black text-white">{collection ? colName : deptName}</h1>
-          <p className="text-zinc-500 mt-1">
-            {collection ? `${deptName} · ${colName}` : deptSubtitle}
-          </p>
-        </div>
+        {/* Section title — banner photo behind the department name */}
+        {DEPT_HERO[department] ? (
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 mb-6 h-40 sm:h-52">
+            <img src={DEPT_HERO[department]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/55 to-zinc-950/10" />
+            <div className="relative h-full flex flex-col justify-end p-4 sm:p-6">
+              <h1 className="text-3xl sm:text-4xl font-black text-white drop-shadow-sm">{collection ? colName : deptName}</h1>
+              <p className="text-zinc-300 mt-1 text-sm sm:text-base drop-shadow-sm">
+                {collection ? `${deptName} · ${colName}` : deptSubtitle}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-6">
+            <h1 className="text-3xl font-black text-white">{collection ? colName : deptName}</h1>
+            <p className="text-zinc-500 mt-1">
+              {collection ? `${deptName} · ${colName}` : deptSubtitle}
+            </p>
+          </div>
+        )}
 
         {/* Search within this department/collection */}
         <div className="relative mb-6">
