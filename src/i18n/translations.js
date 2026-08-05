@@ -33,7 +33,7 @@ export const translations = {
     },
     home: {
       eyebrow: 'Research-Grade · Third-Party Tested',
-      tagline: 'Built on Trust. Driven by Quality. Designed for Those Who Expect More.',
+      tagline: '“Built on Trust.” “Driven by Quality.” “Designed for Those Who Expect More.”',
       browse: 'Browse Products',
       fullCatalog: 'Full Catalog →',
       pills: { coa: 'Premium Quality', shipping: 'Fast Discreet Shipping', checkout: 'Secure Checkout', reviews: 'Verified Reviews' },
@@ -341,7 +341,7 @@ export const translations = {
     },
     home: {
       eyebrow: 'Grado de Investigación · Probado por Terceros',
-      tagline: 'Construido con Confianza. Impulsado por la Calidad. Diseñado para Quienes Esperan Más.',
+      tagline: '“Construido con Confianza.” “Impulsado por la Calidad.” “Diseñado para Quienes Esperan Más.”',
       browse: 'Ver Productos',
       fullCatalog: 'Catálogo Completo →',
       pills: { coa: 'Calidad Premium', shipping: 'Envío Rápido y Discreto', checkout: 'Pago Seguro', reviews: 'Reseñas Verificadas' },
