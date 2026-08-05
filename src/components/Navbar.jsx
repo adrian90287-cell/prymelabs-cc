@@ -45,7 +45,7 @@ export default function Navbar() {
   return (
     <div className="sticky top-0 z-30" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <PromoBanner />
-      <nav className="bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/60">
+      <nav className="bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/60" data-build="cache-bust-1">
         <div className="max-w-7xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
 
           {/* Left: mobile menu button + logo + desktop department nav */}

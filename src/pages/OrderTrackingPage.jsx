@@ -60,7 +60,7 @@ export default function OrderTrackingPage() {
   }
 
   return (
-    <div className="tracking-container" data-build="cache-bust-1">
+    <div className="tracking-container" data-build="cache-bust-2">
       <div className="tracking-header">
         <h1>Order Status</h1>
         <p className="order-number">Order #{order.order.order_number}</p>
