@@ -1,6 +1,7 @@
 // Admin authentication helper - validates JWT tokens
 import { constantTimeCompare } from './constantTime.js';
-import { hasAdminPermission, inferAdminPermission } from './adminPermissions.js';
+import { ensureAdminUsersTable, hasAdminPermission, inferAdminPermission } from './adminPermissions.js';
+import { logAdminAudit } from './adminAudit.js';
 
 // Cloudflare Pages Functions run on the Workers runtime, which has no
 // Node.js Buffer global (no nodejs_compat flag set) — must use Web Crypto
@@ -56,9 +57,25 @@ export async function verifyAdminToken(request, env) {
     if (payload.admin !== true) {
       return { valid: false, error: 'Invalid token' };
     }
+    if (payload.role === 'staff' && payload.admin_user_id) {
+      await ensureAdminUsersTable(env);
+      const row = await env.DB.prepare('SELECT is_active, token_version FROM admin_users WHERE id = ?').bind(payload.admin_user_id).first();
+      if (!row || row.is_active === 0) return { valid: false, error: 'Invalid token' };
+      if ((row.token_version || 0) !== (payload.atv || 0)) return { valid: false, error: 'Invalid token' };
+    }
     const required = inferAdminPermission(request);
+    if (required && payload.needs_2fa_setup === true) {
+      return { valid: false, error: 'Two-factor authentication setup required', status: 403 };
+    }
     if (required && !hasAdminPermission(payload, required)) {
       return { valid: false, error: 'Forbidden', status: 403 };
+    }
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method) && !new URL(request.url).pathname.includes('/api/admin/session')) {
+      logAdminAudit(env, request, payload, 'admin_api.mutate', {
+        target_type: 'route',
+        target_id: new URL(request.url).pathname,
+        metadata: { method: request.method, permission: required || null },
+      }).catch(() => {});
     }
     return { valid: true, payload };
   } catch (e) {

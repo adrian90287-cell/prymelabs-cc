@@ -74,6 +74,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
   ).bind(name.trim(), username.trim().toLowerCase(), email.trim().toLowerCase(), hash, salt, cleanPhone, cleanLang).run()
 
   const userId = result.meta.last_row_id
+  await env.DB.prepare('UPDATE users SET phone_norm = ? WHERE id = ?').bind(cleanPhone, userId).run().catch(() => {})
+  await env.DB.prepare('UPDATE users SET phone_verified = 0 WHERE id = ?').bind(userId).run().catch(() => {})
   const token = await signJWT(
     { sub: userId, username: username.trim().toLowerCase(), name: name.trim(), email: email.trim().toLowerCase(), phone: cleanPhone, lang: cleanLang, tv: 0, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
     env.JWT_SECRET

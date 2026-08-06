@@ -6,6 +6,7 @@ import { verifyAdminToken } from '../../_utils/adminAuth.js';
 import { constantTimeCompare } from '../../_utils/constantTime.js';
 import { verifyPassword } from '../../_utils/crypto.js';
 import { ensureAdminUsersTable } from '../../_utils/adminPermissions.js';
+import { logAdminAudit } from '../../_utils/adminAudit.js';
 
 export async function onRequest({ request, env }) {
   if (request.method === 'GET') return handleStatus(request, env);
@@ -48,8 +49,9 @@ async function handleDisable(request, env) {
     if (!row || !password || !await verifyPassword(String(password), row.password_hash, row.salt)) {
       return new Response(JSON.stringify({ error: 'Incorrect password' }), { status: 401 });
     }
-    await env.DB.prepare('UPDATE admin_users SET totp_enabled = 0, totp_secret = NULL, updated_at = ? WHERE id = ?')
+    await env.DB.prepare('UPDATE admin_users SET totp_enabled = 0, totp_secret = NULL, updated_at = ?, token_version = token_version + 1 WHERE id = ?')
       .bind(Math.floor(Date.now() / 1000), authResult.payload.admin_user_id).run();
+    await logAdminAudit(env, request, authResult.payload, 'admin_2fa.disabled', { target_type: 'admin_user', target_id: authResult.payload.admin_user_id });
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -69,6 +71,7 @@ async function handleDisable(request, env) {
     env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_2fa_enabled', '0')"),
     env.DB.prepare("DELETE FROM settings WHERE key = 'admin_2fa_secret'"),
   ]);
+  await logAdminAudit(env, request, authResult.payload, 'admin_2fa.disabled', { target_type: 'owner', target_id: 'owner' });
 
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,

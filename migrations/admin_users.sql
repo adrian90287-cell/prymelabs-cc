@@ -11,10 +11,25 @@ CREATE TABLE IF NOT EXISTS admin_users (
   permissions_json TEXT NOT NULL DEFAULT '[]',
   totp_secret TEXT,
   totp_enabled INTEGER NOT NULL DEFAULT 0,
+  token_version INTEGER NOT NULL DEFAULT 0,
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
   updated_at INTEGER,
   last_login_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_role TEXT,
+  actor_admin_user_id INTEGER,
+  actor_username TEXT,
+  action TEXT NOT NULL,
+  target_type TEXT,
+  target_id TEXT,
+  metadata_json TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 
 CREATE TABLE IF NOT EXISTS admin_password_resets (

@@ -26,6 +26,7 @@ const ADMIN_PERMISSION_ORDER = Object.keys(ADMIN_PERMISSION_LABELS)
 function adminCan(admin, permission) {
   if (!permission) return true
   if (!admin) return false
+  if (admin.needs_2fa_setup) return false
   if (admin.owner || admin.role === 'owner') return true
   return Array.isArray(admin.permissions) && admin.permissions.includes(permission)
 }
@@ -5990,7 +5991,7 @@ function WillCallTab({ onOrderCreated }) {
 function AdminUsersTab() {
   const showToast = useToast()
   const adminToken = sessionStorage.getItem('pl_admin_token')
-  const blank = { id: null, name: '', username: '', email: '', password: '', permissions: [], is_active: true }
+  const blank = { id: null, name: '', username: '', email: '', password: '', permissions: [], is_active: true, send_invite: true }
   const [users, setUsers] = useState([])
   const [form, setForm] = useState(blank)
   const [loading, setLoading] = useState(false)
@@ -6019,7 +6020,7 @@ function AdminUsersTab() {
 
   const editUser = (u) => {
     setErr('')
-    setForm({ ...u, password: '', permissions: Array.isArray(u.permissions) ? u.permissions : [] })
+    setForm({ ...u, password: '', send_invite: false, permissions: Array.isArray(u.permissions) ? u.permissions : [] })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -6115,8 +6116,16 @@ function AdminUsersTab() {
             className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
           <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="Email optional"
             className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
-          <input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder={form.id ? 'New password optional' : 'Password'}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+          {!form.id && (
+            <label className="flex items-center gap-2 text-zinc-300 text-sm">
+              <input type="checkbox" checked={form.send_invite === true} onChange={e => setForm(p => ({ ...p, send_invite: e.target.checked, password: e.target.checked ? '' : p.password }))} className="w-4 h-4 accent-blue-600" />
+              Send setup invite so they create their own password
+            </label>
+          )}
+          {(!form.send_invite || form.id) && (
+            <input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder={form.id ? 'New password optional' : 'Password'}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+          )}
           <label className="flex items-center gap-2 text-zinc-300 text-sm">
             <input type="checkbox" checked={form.is_active !== false} onChange={e => setForm(p => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 accent-blue-600" />
             Active user
@@ -6144,7 +6153,7 @@ function AdminUsersTab() {
   )
 }
 
-function AdminAccountTab({ adminMe, onProfileUpdated }) {
+function AdminAccountTab({ adminMe, onProfileUpdated, onPasswordChanged }) {
   const showToast = useToast()
   const adminToken = sessionStorage.getItem('pl_admin_token')
   const [form, setForm] = useState({ username: adminMe?.username || 'owner', email: adminMe?.email || '', current_password: '', new_password: '' })
@@ -6169,6 +6178,10 @@ function AdminAccountTab({ adminMe, onProfileUpdated }) {
       const d = await res.json()
       if (!res.ok) { setErr(d.error || 'Could not update profile'); return }
       showToast('Admin account updated')
+      if (form.new_password) {
+        onPasswordChanged?.()
+        return
+      }
       setForm(p => ({ ...p, current_password: '', new_password: '' }))
       onProfileUpdated?.(d.admin)
     } catch { setErr('Network error updating profile') }
@@ -6196,8 +6209,7 @@ function AdminAccountTab({ adminMe, onProfileUpdated }) {
       const d = await res.json()
       if (!res.ok) { setErr(d.error || 'Could not enable 2FA'); return }
       showToast('2FA enabled')
-      setTotp(p => ({ ...p, enabled: true, secret: '', otpauthUrl: '', code: '' }))
-      onProfileUpdated?.({ ...adminMe, totp_enabled: true })
+      onPasswordChanged?.()
     } catch { setErr('Network error enabling 2FA') }
   }
 
@@ -6212,8 +6224,7 @@ function AdminAccountTab({ adminMe, onProfileUpdated }) {
       const d = await res.json()
       if (!res.ok) { setErr(d.error || 'Could not disable 2FA'); return }
       showToast('2FA disabled')
-      setTotp(p => ({ ...p, enabled: false, password: '' }))
-      onProfileUpdated?.({ ...adminMe, totp_enabled: false })
+      onPasswordChanged?.()
     } catch { setErr('Network error disabling 2FA') }
   }
 
@@ -6223,6 +6234,11 @@ function AdminAccountTab({ adminMe, onProfileUpdated }) {
         <h2 className="text-white font-bold text-lg">My Admin Account</h2>
         <p className="text-zinc-500 text-sm">Change your admin username/password and manage your own 2FA.</p>
       </div>
+      {adminMe?.needs_2fa_setup && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-amber-300 text-sm">
+          Two-factor authentication is required for your access level. Set up 2FA below before using the rest of the admin panel.
+        </div>
+      )}
       {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
 
       <form onSubmit={saveProfile} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4">
@@ -6275,6 +6291,58 @@ function AdminAccountTab({ adminMe, onProfileUpdated }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function AdminAuditTab() {
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const loadEvents = useCallback(async () => {
+    setLoading(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/audit-log', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not load audit log'); return }
+      setEvents(d.events || [])
+    } catch { setErr('Network error loading audit log') }
+    finally { setLoading(false) }
+  }, [adminToken])
+
+  useEffect(() => { loadEvents() }, [loadEvents])
+
+  return (
+    <div className="max-w-5xl space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-white font-bold text-lg">Admin Audit Log</h2>
+          <p className="text-zinc-500 text-sm">Recent sensitive admin actions: users, permissions, passwords, and 2FA.</p>
+        </div>
+        <button onClick={loadEvents} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Refresh</button>
+      </div>
+      {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : events.length === 0 ? (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-zinc-500 text-sm">No audit events yet.</div>
+      ) : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">
+          {events.map(e => (
+            <div key={e.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-bold text-sm">{e.action}</div>
+                <div className="text-zinc-500 text-xs">
+                  {e.actor_username || e.actor_role || 'Unknown'} · {e.target_type || 'system'}{e.target_id ? ` #${e.target_id}` : ''}
+                </div>
+              </div>
+              <div className="text-zinc-600 text-xs shrink-0">{e.created_at ? new Date(e.created_at * 1000).toLocaleString() : ''}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -6427,6 +6495,7 @@ export default function AdminPage() {
       { id: 'suggestions', permission: 'suggestions' },
       { id: 'trash', permission: 'trash' },
       { id: 'admin-users', permission: 'admin_users' },
+      { id: 'audit', permission: 'admin_users' },
       { id: 'account', permission: null },
     ].filter(t => adminCan(adminMe, t.permission))
     if (!visible.some(t => t.id === tab)) setTab(visible[0]?.id || 'storefront')
@@ -6631,6 +6700,7 @@ export default function AdminPage() {
     { id: 'suggestions', label: '💡 Suggestions',  short: '💡', permission: 'suggestions' },
     { id: 'trash',       label: 'Trash',           short: '🗑️', permission: 'trash' },
     { id: 'admin-users', label: 'Admin Users',     short: '👮', permission: 'admin_users' },
+    { id: 'audit',       label: 'Audit Log',       short: '🧾', permission: 'admin_users' },
     { id: 'account',     label: 'My Account',      short: '🔐' },
   ].filter(t => adminCan(adminMe, t.permission))
 
@@ -6725,7 +6795,12 @@ export default function AdminPage() {
         {tab === 'suggestions' && adminCan(adminMe, 'suggestions') && <SuggestionsTab />}
         {tab === 'trash' && adminCan(adminMe, 'trash') && <TrashTab />}
         {tab === 'admin-users' && adminCan(adminMe, 'admin_users') && <AdminUsersTab />}
-        {tab === 'account' && <AdminAccountTab adminMe={adminMe} onProfileUpdated={(next) => setAdminMe(p => ({ ...p, ...next }))} />}
+        {tab === 'audit' && adminCan(adminMe, 'admin_users') && <AdminAuditTab />}
+        {tab === 'account' && <AdminAccountTab
+          adminMe={adminMe}
+          onProfileUpdated={(next) => setAdminMe(p => ({ ...p, ...next }))}
+          onPasswordChanged={() => { sessionStorage.removeItem('pl_admin_token'); setAdminMe(null); setAuthed(false) }}
+        />}
       </main>
     </div>
     </ToastProvider>

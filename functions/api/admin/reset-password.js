@@ -36,7 +36,7 @@ export async function onRequestPost({ request, env }) {
       env.DB.prepare('UPDATE admin_password_resets SET used = 1 WHERE owner = 1'),
     ])
   } else {
-    await env.DB.prepare('UPDATE admin_users SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?')
+    await env.DB.prepare('UPDATE admin_users SET password_hash = ?, salt = ?, updated_at = ?, token_version = token_version + 1 WHERE id = ?')
       .bind(hash, salt, now, reset.admin_user_id).run()
     await env.DB.prepare('UPDATE admin_password_resets SET used = 1 WHERE admin_user_id = ?').bind(reset.admin_user_id).run()
   }

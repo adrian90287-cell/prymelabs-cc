@@ -34,6 +34,8 @@ export const ADMIN_PERMISSION_LABELS = {
   admin_users: 'Admin Users & Permissions',
 }
 
+export const HIGH_RISK_ADMIN_PERMISSIONS = ['orders', 'inventory', 'settings', 'admin_users']
+
 export function normalizePermissions(value) {
   let arr = value
   if (typeof value === 'string') {
@@ -41,6 +43,11 @@ export function normalizePermissions(value) {
   }
   if (!Array.isArray(arr)) arr = []
   return [...new Set(arr.filter(p => ADMIN_PERMISSIONS.includes(p)))]
+}
+
+export function requiresStrongAdmin2FA(permissions) {
+  const perms = normalizePermissions(permissions)
+  return perms.some(p => HIGH_RISK_ADMIN_PERMISSIONS.includes(p))
 }
 
 export function hasAdminPermission(payload, permission) {
@@ -61,6 +68,7 @@ export function inferAdminPermission(request) {
 
     if (path === '/api/admin/session') return null
     if (path === '/api/admin/profile' || path === '/api/admin/totp' || path === '/api/admin/totp-disable') return null
+    if (path === '/api/admin/audit-log') return 'admin_users'
     if (path === '/api/admin/users') return 'admin_users'
     if (path === '/api/admin/dashboard') return 'orders'
     if (path === '/api/admin/products' || path === '/api/admin/generate-description' || path === '/api/admin/translate-all') return 'inventory'
@@ -106,6 +114,7 @@ export async function ensureAdminUsersTable(env) {
       permissions_json TEXT NOT NULL DEFAULT '[]',
       totp_secret TEXT,
       totp_enabled INTEGER NOT NULL DEFAULT 0,
+      token_version INTEGER NOT NULL DEFAULT 0,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
       updated_at INTEGER,
@@ -115,6 +124,7 @@ export async function ensureAdminUsersTable(env) {
   for (const stmt of [
     "ALTER TABLE admin_users ADD COLUMN totp_secret TEXT",
     "ALTER TABLE admin_users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE admin_users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0",
   ]) {
     try { await env.DB.prepare(stmt).run() } catch {}
   }
@@ -126,6 +136,21 @@ export async function ensureAdminUsersTable(env) {
       token_hash TEXT NOT NULL UNIQUE,
       expires_at INTEGER NOT NULL,
       used INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    )
+  `).run()
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS admin_audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_role TEXT,
+      actor_admin_user_id INTEGER,
+      actor_username TEXT,
+      action TEXT NOT NULL,
+      target_type TEXT,
+      target_id TEXT,
+      metadata_json TEXT,
+      ip TEXT,
+      user_agent TEXT,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     )
   `).run()
@@ -141,6 +166,7 @@ export function publicAdminUser(row) {
     permissions: normalizePermissions(row.permissions_json),
     is_active: row.is_active !== 0,
     totp_enabled: row.totp_enabled === 1,
+    token_version: row.token_version || 0,
     created_at: row.created_at || null,
     updated_at: row.updated_at || null,
     last_login_at: row.last_login_at || null,

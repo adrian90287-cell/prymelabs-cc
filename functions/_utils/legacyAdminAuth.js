@@ -6,6 +6,7 @@ import { verifyAdminToken } from './adminAuth.js';
 import { constantTimeCompare } from './constantTime.js';
 import { checkAdminRateLimit, adminRateLimitKey } from './adminRateLimit.js';
 import { hasAdminPermission, inferAdminPermission } from './adminPermissions.js';
+import { logAdminAudit } from './adminAudit.js';
 
 export async function adminAuth(request, env) {
   // A valid JWT (the common case for an already-logged-in admin) never touches
@@ -24,7 +25,16 @@ export async function adminAuth(request, env) {
 
   if (!env.ADMIN_PASSWORD) return false; // fail closed if unset, not "admin:undefined"
   const auth = request.headers.get('Authorization') || '';
-  if (constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`)) return true;
+  if (constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`)) {
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method)) {
+      logAdminAudit(env, request, { role: 'owner', owner: true, username: 'legacy-owner' }, 'admin_api.mutate', {
+        target_type: 'route',
+        target_id: new URL(request.url).pathname,
+        metadata: { method: request.method, legacy: true },
+      }).catch(() => {});
+    }
+    return true;
+  }
   return false;
 }
 
@@ -40,6 +50,13 @@ export async function adminAuthResult(request, env) {
     const payload = { admin: true, owner: true, role: 'owner', permissions: ['*'] };
     const required = inferAdminPermission(request);
     if (required && !hasAdminPermission(payload, required)) return { valid: false, error: 'Forbidden', status: 403 };
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method)) {
+      logAdminAudit(env, request, payload, 'admin_api.mutate', {
+        target_type: 'route',
+        target_id: new URL(request.url).pathname,
+        metadata: { method: request.method, permission: required || null, legacy: true },
+      }).catch(() => {});
+    }
     return { valid: true, payload };
   }
   return { valid: false, error: 'Unauthorized', status: 401 };

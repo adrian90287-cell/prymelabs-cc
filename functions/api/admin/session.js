@@ -5,7 +5,7 @@ import { verifyTOTP } from '../../_utils/totpCore.js';
 import { constantTimeCompare } from '../../_utils/constantTime.js';
 import { verifyAdminToken } from '../../_utils/adminAuth.js';
 import { verifyPassword } from '../../_utils/crypto.js';
-import { ensureAdminUsersTable, normalizePermissions, publicAdminUser } from '../../_utils/adminPermissions.js';
+import { ensureAdminUsersTable, normalizePermissions, publicAdminUser, requiresStrongAdmin2FA } from '../../_utils/adminPermissions.js';
 
 function base64url(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -123,6 +123,7 @@ async function handleLogin(request, env) {
             email: pending.adminUser.email || '',
             permissions: normalizePermissions(pending.adminUser.permissions),
             totp_enabled: true,
+            atv: pending.adminUser.atv || 0,
           }
         : { admin: true, owner: true, role: 'owner', permissions: ['*'], name: 'Owner' };
       const token = await signJWT(tokenPayload, secret);
@@ -178,6 +179,8 @@ async function handleLogin(request, env) {
           email: row.email || '',
           permissions: normalizePermissions(row.permissions_json),
           totp_enabled: row.totp_enabled === 1,
+          atv: row.token_version || 0,
+          needs_2fa_setup: requiresStrongAdmin2FA(row.permissions_json) && row.totp_enabled !== 1,
         };
       }
     }
@@ -230,14 +233,17 @@ async function handleVerify(request, env) {
       valid: true,
       message: 'Token is valid',
       admin: authResult.payload?.role === 'staff'
-        ? publicAdminUser({
+        ? {
+          ...publicAdminUser({
             id: authResult.payload.admin_user_id,
             name: authResult.payload.name,
             username: authResult.payload.username,
             email: authResult.payload.email,
             permissions_json: JSON.stringify(authResult.payload.permissions || []),
             is_active: 1,
-          })
+          }),
+          needs_2fa_setup: authResult.payload.needs_2fa_setup === true,
+        }
         : { role: 'owner', owner: true, name: authResult.payload?.name || 'Owner', permissions: ['*'] }
     }), { status: 200 });
   } catch (e) {

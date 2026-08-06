@@ -6,6 +6,7 @@ import { verifyAdminToken } from '../../_utils/adminAuth.js';
 import { base32Encode, verifyTOTP } from '../../_utils/totpCore.js';
 import { logSecurityEvent, SECURITY_EVENT_TYPES } from '../../_utils/securityLog.js';
 import { ensureAdminUsersTable } from '../../_utils/adminPermissions.js';
+import { logAdminAudit } from '../../_utils/adminAudit.js';
 
 export async function onRequest({ request, env }) {
   if (request.method === 'POST') return handleEnable(request, env);
@@ -53,13 +54,15 @@ async function handleEnable(request, env) {
 
   if (authResult.payload.role === 'staff' && authResult.payload.admin_user_id) {
     await ensureAdminUsersTable(env);
-    await env.DB.prepare('UPDATE admin_users SET totp_secret = ?, totp_enabled = 1, updated_at = ? WHERE id = ?')
+    await env.DB.prepare('UPDATE admin_users SET totp_secret = ?, totp_enabled = 1, updated_at = ?, token_version = token_version + 1 WHERE id = ?')
       .bind(secret, Math.floor(Date.now() / 1000), authResult.payload.admin_user_id).run();
+    await logAdminAudit(env, request, authResult.payload, 'admin_2fa.enabled', { target_type: 'admin_user', target_id: authResult.payload.admin_user_id });
   } else {
     await env.DB.batch([
       env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_2fa_secret', ?)").bind(secret),
       env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_2fa_enabled', '1')"),
     ]);
+    await logAdminAudit(env, request, authResult.payload, 'admin_2fa.enabled', { target_type: 'owner', target_id: 'owner' });
   }
 
   return new Response(JSON.stringify({ ok: true }), {

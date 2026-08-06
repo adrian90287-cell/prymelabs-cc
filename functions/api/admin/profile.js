@@ -3,6 +3,7 @@ import { verifyAdminToken } from '../../_utils/adminAuth.js'
 import { hashPassword, verifyPassword } from '../../_utils/crypto.js'
 import { ensureAdminUsersTable, publicAdminUser } from '../../_utils/adminPermissions.js'
 import { constantTimeCompare } from '../../_utils/constantTime.js'
+import { logAdminAudit } from '../../_utils/adminAudit.js'
 
 async function ownerProfile(env) {
   const username = (await env.DB.prepare("SELECT value FROM settings WHERE key = 'admin_owner_username'").first().catch(() => null))?.value || 'owner'
@@ -66,7 +67,7 @@ export async function onRequestPut({ request, env }) {
   try {
     if (newPassword) {
       const { hash, salt } = await hashPassword(newPassword)
-      await env.DB.prepare('UPDATE admin_users SET username = ?, email = ?, password_hash = ?, salt = ?, updated_at = ? WHERE id = ?')
+      await env.DB.prepare('UPDATE admin_users SET username = ?, email = ?, password_hash = ?, salt = ?, updated_at = ?, token_version = token_version + 1 WHERE id = ?')
         .bind(username, email || null, hash, salt, Math.floor(Date.now() / 1000), row.id).run()
     } else {
       await env.DB.prepare('UPDATE admin_users SET username = ?, email = ?, updated_at = ? WHERE id = ?')
@@ -75,6 +76,7 @@ export async function onRequestPut({ request, env }) {
   } catch {
     return json({ error: 'Username or email already exists' }, 409)
   }
+  await logAdminAudit(env, request, auth.payload, 'admin_profile.updated', { target_type: 'admin_user', target_id: row.id, metadata: { username, changed_password: !!newPassword } })
   return json({ ok: true })
 }
 
