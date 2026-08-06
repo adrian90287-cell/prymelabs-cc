@@ -42,13 +42,15 @@ export async function onRequest({ request, env }) {
     // Build customer-safe response (no sensitive data)
     const items = JSON.parse(order.items_json || '[]')
     const shipping = JSON.parse(order.shipping_json || '{}')
+    const willCall = isWillCall(order, shipping)
+    const tracking = safeJson(order.tracking_json, {})
 
     // Status timeline
     const timeline = buildTimeline(order)
 
     // Pickup info for will-call
     let pickupInfo = null
-    if (order.is_will_call && order.ready_after) {
+    if (willCall && order.ready_after) {
       pickupInfo = {
         ready_after: order.ready_after,
         ready_date: new Date(order.ready_after * 1000).toLocaleDateString('en-US', {
@@ -63,14 +65,11 @@ export async function onRequest({ request, env }) {
 
     // Tracking info for shipped
     let trackingInfo = null
-    if (order.tracking) {
-      const tracking = typeof order.tracking === 'string' ? JSON.parse(order.tracking) : order.tracking
-      if (tracking.number) {
-        trackingInfo = {
-          number: tracking.number,
-          carrier: tracking.carrier || 'Unknown',
-          url: tracking.url || null
-        }
+    if (tracking.number) {
+      trackingInfo = {
+        number: tracking.number,
+        carrier: tracking.carrier || 'Unknown',
+        url: tracking.tracking_url || tracking.url || null
       }
     }
 
@@ -88,7 +87,7 @@ export async function onRequest({ request, env }) {
       timeline,
       tracking: trackingInfo,
       pickup: pickupInfo,
-      shipping: {
+      shipping: willCall ? null : {
         name: shipping.name,
         address: shipping.address,
         city: shipping.city,
@@ -106,6 +105,8 @@ export async function onRequest({ request, env }) {
 
 function buildTimeline(order) {
   const timeline = []
+  const shipping = safeJson(order.shipping_json, {})
+  const willCall = isWillCall(order, shipping)
 
   // Order created
   timeline.push({
@@ -116,19 +117,19 @@ function buildTimeline(order) {
   })
 
   // Payment verified
-  if (order.payment_verified_at) {
+  if (order.paid_at) {
     timeline.push({
       status: 'payment_verified',
-      timestamp: order.payment_verified_at,
-      label: order.is_will_call ? 'Payment Verified' : 'Payment Received',
-      description: order.is_will_call
+      timestamp: order.paid_at,
+      label: willCall ? 'Payment Verified' : 'Payment Received',
+      description: willCall
         ? 'Your payment has been verified. We are preparing your order.'
         : 'Your payment has been received. Your order is being prepared.'
     })
   }
 
   // Ready for pickup (will-call only)
-  if (order.is_will_call && order.ready_after) {
+  if (willCall && order.ready_after) {
     timeline.push({
       status: 'ready_for_pickup',
       timestamp: order.ready_after,
@@ -149,7 +150,7 @@ function buildTimeline(order) {
 
   // Completed
   if (order.status === 'completed' || order.status === 'refunded') {
-    if (order.is_will_call) {
+    if (willCall) {
       timeline.push({
         status: 'completed',
         timestamp: order.updated_at,
@@ -187,4 +188,17 @@ function buildTimeline(order) {
   }
 
   return timeline
+}
+
+function safeJson(value, fallback = {}) {
+  try { return JSON.parse(value || 'null') || fallback } catch { return fallback }
+}
+
+function isWillCall(order, shipping = {}) {
+  return Boolean(
+    order.is_will_call ||
+    (typeof order.order_number === 'string' && order.order_number.includes('-WC-')) ||
+    shipping.pickup === true ||
+    order.shipping_rate_name === 'Will Call — Pickup'
+  )
 }

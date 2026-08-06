@@ -267,7 +267,7 @@ function EasyPostPanel({ order, onRefresh, onClose, reship = false }) {
   const [label, setLabel]       = useState(null)
   const [busy, setBusy]         = useState(false)
   const [err, setErr]           = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin')
+  const adminToken = sessionStorage.getItem('pl_admin_token')
   const showToast  = useToast()
 
   // Editable ship-to address — expanded by default when reshipping so the admin
@@ -1782,7 +1782,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               try {
                 const res = await fetch('/api/admin/generate-description', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${sessionStorage.getItem('pl_admin')}` },
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('pl_admin_token')}` },
                   body: JSON.stringify({ name: form.name, category: form.category, size: form.size, department: form.department, field: 'tagline' }),
                 })
                 const data = await res.json()
@@ -1839,7 +1839,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               try {
                 const res = await fetch('/api/admin/generate-description', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${sessionStorage.getItem('pl_admin')}` },
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('pl_admin_token')}` },
                   body: JSON.stringify({ name: form.name, category: form.category, size: form.size, department: form.department }),
                 })
                 const data = await res.json()
@@ -6009,7 +6009,7 @@ export default function AdminPage() {
   }, [])
 
   const enablePush = useCallback(async () => {
-    const token = sessionStorage.getItem('pl_admin')
+    const token = sessionStorage.getItem('pl_admin_token')
     if (!token) return
     setPushState('loading')
     try {
@@ -6031,7 +6031,7 @@ export default function AdminPage() {
       // 4. Save subscription on server
       const saveRes = await fetch('/api/admin/push-subscribe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ subscription: sub.toJSON() }),
       })
       if (saveRes.ok) setPushState('enabled')
@@ -6043,14 +6043,14 @@ export default function AdminPage() {
   }, [])
 
   const disablePush = useCallback(async () => {
-    const token = sessionStorage.getItem('pl_admin')
+    const token = sessionStorage.getItem('pl_admin_token')
     try {
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()
       if (sub) {
         await fetch('/api/admin/push-subscribe', {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer admin:${token}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ endpoint: sub.endpoint }),
         })
         await sub.unsubscribe()
@@ -6082,12 +6082,8 @@ export default function AdminPage() {
       const data = await res.json()
       if (res.ok && data.requires2fa) {
         setPendingToken(data.pendingToken)
-        // pw is kept (not cleared) so it can still sync 'pl_admin' once 2FA completes
       } else if (res.ok && data.token) {
         sessionStorage.setItem('pl_admin_token', data.token)
-        // Legacy endpoints check `Bearer admin:<password>` directly against
-        // ADMIN_PASSWORD rather than verifying the JWT — keep both in sync.
-        sessionStorage.setItem('pl_admin', pw)
         setPw('')
         setAuthed(true)
       } else if (res.status === 429) {
@@ -6110,7 +6106,6 @@ export default function AdminPage() {
       const data = await res.json()
       if (res.ok && data.token) {
         sessionStorage.setItem('pl_admin_token', data.token)
-        sessionStorage.setItem('pl_admin', pw)
         setPw(''); setPendingToken(null); setTwoFACode('')
         setAuthed(true)
       } else if (res.status === 429) {
@@ -6274,7 +6269,7 @@ export default function AdminPage() {
                 )}
               </button>
             )}
-            <button onClick={() => { sessionStorage.removeItem('pl_admin'); localStorage.removeItem('pl_admin_pw'); localStorage.removeItem('pl_admin_bypass'); setAuthed(false) }}
+            <button onClick={() => { sessionStorage.removeItem('pl_admin_token'); sessionStorage.removeItem('pl_admin'); localStorage.removeItem('pl_admin_pw'); localStorage.removeItem('pl_admin_bypass'); setAuthed(false) }}
               className="text-xs text-zinc-500 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg hover:bg-zinc-800">
               Sign Out
             </button>

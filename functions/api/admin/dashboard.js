@@ -60,6 +60,8 @@ export async function onRequestGet({ request, env }) {
     tracking: safeJson(o.tracking_json, {}),
   }))
 
+  await attachOrderHistory(env, ordersWithParsed)
+
   return json({ stats, orders: ordersWithParsed, products: products.results || [] })
 }
 
@@ -69,4 +71,45 @@ export async function onRequestOptions() {
 
 function safeJson(s, def) {
   try { return JSON.parse(s || 'null') || def } catch { return def }
+}
+
+async function attachOrderHistory(env, orders) {
+  if (!orders.length) return
+  const ids = orders.map(o => o.id).filter(Boolean)
+  if (!ids.length) return
+
+  const byId = new Map(orders.map(o => [o.id, o]))
+  for (const order of orders) {
+    order.order_notifications = []
+    order.order_events = []
+  }
+
+  const placeholders = ids.map(() => '?').join(',')
+
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT order_id, notification_type, recipient_email, status, error_message, sent_at
+       FROM order_notifications
+       WHERE order_id IN (${placeholders})
+       ORDER BY sent_at DESC
+       LIMIT 500`
+    ).bind(...ids).all()
+    for (const row of results || []) byId.get(row.order_id)?.order_notifications.push(row)
+  } catch {
+    // Older deployments may not have the audit-log tables yet. Keep dashboard
+    // usable and simply show empty history until the migration is present.
+  }
+
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT order_id, event_type, event_data, created_at
+       FROM order_events
+       WHERE order_id IN (${placeholders})
+       ORDER BY created_at DESC
+       LIMIT 500`
+    ).bind(...ids).all()
+    for (const row of results || []) byId.get(row.order_id)?.order_events.push(row)
+  } catch {
+    // See note above.
+  }
 }

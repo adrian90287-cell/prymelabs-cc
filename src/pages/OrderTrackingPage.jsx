@@ -8,7 +8,7 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const orderNumber = searchParams.get('order')
+  const orderNumber = searchParams.get('order_number') || searchParams.get('order')
   const email = searchParams.get('email')
 
   useEffect(() => {
@@ -58,6 +58,8 @@ export default function OrderTrackingPage() {
       </div>
     )
   }
+
+  const money = value => `$${Number(value || 0).toFixed(2)}`
 
   return (
     <div className="tracking-container" data-build="cache-bust-2">
@@ -153,19 +155,19 @@ export default function OrderTrackingPage() {
         <div className="totals">
           <div className="total-row">
             <span>Subtotal</span>
-            <span>${(order.order.subtotal / 100).toFixed(2)}</span>
+            <span>{money(order.order.subtotal)}</span>
           </div>
           <div className="total-row">
             <span>Shipping</span>
-            <span>${(order.order.shipping_cost / 100).toFixed(2)}</span>
+            <span>{money(order.order.shipping_cost)}</span>
           </div>
           <div className="total-row">
             <span>Tax</span>
-            <span>${(order.order.tax_amount / 100).toFixed(2)}</span>
+            <span>{money(order.order.tax_amount)}</span>
           </div>
           <div className="total-row final">
             <span>Total</span>
-            <span>${(order.order.order_total / 100).toFixed(2)}</span>
+            <span>{money(order.order.order_total)}</span>
           </div>
         </div>
       </div>

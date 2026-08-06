@@ -3,6 +3,7 @@
 import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js';
 import { verifyTOTP } from '../../_utils/totpCore.js';
 import { constantTimeCompare } from '../../_utils/constantTime.js';
+import { verifyAdminToken } from '../../_utils/adminAuth.js';
 
 function base64url(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -161,17 +162,10 @@ async function handleLogin(request, env) {
 
 async function handleVerify(request, env) {
   try {
-    const auth = request.headers.get('Authorization') || '';
-    const token = auth.replace('Bearer ', '');
-
-    if (!token) {
+    const authResult = await verifyAdminToken(request, env);
+    if (!authResult.valid) {
       return new Response(JSON.stringify({ valid: false }), { status: 401 });
     }
-    if (!env.JWT_SECRET) {
-      return new Response(JSON.stringify({ valid: false, error: 'Server misconfigured' }), { status: 500 });
-    }
-
-    await verifyJWT(token, env.JWT_SECRET);
 
     return new Response(JSON.stringify({
       valid: true,

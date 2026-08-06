@@ -6,8 +6,8 @@ export function authHeaders() {
   try {
     const token = localStorage.getItem('pl_token')
     if (token) return { Authorization: `Bearer ${token}` }
-    const admin = sessionStorage.getItem('pl_admin')
-    if (admin) return { Authorization: `Bearer admin:${admin}` }
+    const adminToken = sessionStorage.getItem('pl_admin_token')
+    if (adminToken) return { Authorization: `Bearer ${adminToken}` }
   } catch { /* storage unavailable */ }
   return {}
 }

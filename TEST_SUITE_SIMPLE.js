@@ -22,7 +22,7 @@ test('All new files created', () => {
   const files = [
     'functions/_utils/orderNotifications.js',
     'functions/_utils/inventoryVerification.js',
-    'functions/api/admin/update-order-v2.js',
+    'functions/api/admin/update-order.js',
     'functions/api/orders/track.js',
     'src/pages/OrderTrackingPage.jsx',
     'src/styles/OrderTrackingPage.css',
@@ -59,8 +59,8 @@ test('Inventory functions exported', () => {
 })
 
 // Test 4: Update order endpoint
-test('Update order v2 endpoint created', () => {
-  const content = fs.readFileSync(`${basePath}\\functions\\api\\admin\\update-order-v2.js`, 'utf8')
+test('Update order endpoint supports enhanced workflow', () => {
+  const content = fs.readFileSync(`${basePath}\\functions\\api\\admin\\update-order.js`, 'utf8')
   assert(content.includes('onRequest'), 'Missing onRequest')
   assert(content.includes('fulfilled'), 'Missing fulfilled handling')
   assert(content.includes('shipped'), 'Missing shipped handling')

@@ -11,6 +11,7 @@ import {
 } from '../../_utils/email.js'
 import { uploadToOneDrive } from '../../_utils/onedrive.js'
 import { statusUpdateHtml, orderReceiptHtml, isWillCall } from '../../_utils/documents.js'
+import { logNotification, logOrderEvent } from '../../_utils/orderNotifications.js'
 
 
 export async function onRequestPost({ request, env, waitUntil }) {
@@ -80,6 +81,15 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   await env.DB.prepare(`UPDATE orders SET ${cols.join(', ')} WHERE id = ?`).bind(...params).run()
 
+  if (statusChanging) {
+    waitUntil(logOrderEvent(env, order_id, 'status_changed', {
+      from: order.status,
+      to: status,
+      tracking: tracking ? { carrier: tracking.carrier || null, number: tracking.number || null } : null,
+      ready_after: ready_after ?? null,
+    }).catch(() => {}))
+  }
+
   // Restore stock when cancelling or refunding a non-cancelled/refunded order
   const wasActive = !['cancelled', 'refunded'].includes(order.status)
   const isNowInactive = ['cancelled', 'refunded'].includes(status)
@@ -142,9 +152,16 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
   const isEs = userLang === 'es'
 
+  const queueCustomerEmail = (notificationType, message) => {
+    waitUntil(message
+      .then(() => logNotification(env, order_id, notificationType, order.customer_email, custPhone || null, 'sent'))
+      .catch(e => logNotification(env, order_id, notificationType, order.customer_email, custPhone || null, 'failed', e?.message || 'send failed'))
+      .catch(() => {}))
+  }
+
   // ── Paid: payment verified ─────────────────────────────────────────────────
   if (status === 'paid' && statusChanging && order.customer_email) {
-    waitUntil(sendEmail(env, {
+    queueCustomerEmail('payment_verified', sendEmail(env, {
       to: order.customer_email,
       subject: isEs
         ? `✅ Pago Confirmado — ${order.order_number}`
@@ -152,7 +169,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       html: isEs
         ? paidConfirmationHtmlEs({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal, payment_method: order.payment_method })
         : paidConfirmationHtml({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal, payment_method: order.payment_method }),
-    }).catch(() => {}))
+    }))
     if (custPhone) {
       waitUntil(sendSMS(env, {
         to: custPhone,
@@ -165,13 +182,13 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   // ── Will Call: ready for pickup (fulfilled) ────────────────────────────────
   if (status === 'fulfilled' && statusChanging && isWillCall(order) && order.customer_email) {
-    waitUntil(sendEmail(env, {
+    queueCustomerEmail('ready_for_pickup', sendEmail(env, {
       to: order.customer_email,
       subject: isEs ? `🏷️ Listo para recoger — ${order.order_number}` : `🏷️ Ready for Pickup — ${order.order_number}`,
       html: isEs
         ? willCallReadyHtmlEs({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal })
         : willCallReadyHtml({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal }),
-    }).catch(() => {}))
+    }))
     if (custPhone) {
       waitUntil(sendSMS(env, {
         to: custPhone,
@@ -184,13 +201,13 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   // ── Will Call: picked up (completed) ───────────────────────────────────────
   if (status === 'completed' && statusChanging && isWillCall(order) && order.customer_email) {
-    waitUntil(sendEmail(env, {
+    queueCustomerEmail('completed', sendEmail(env, {
       to: order.customer_email,
       subject: isEs ? `✅ Pedido recogido — ${order.order_number}` : `✅ Order Picked Up — ${order.order_number}`,
       html: isEs
         ? willCallPickedUpHtmlEs({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal })
         : willCallPickedUpHtml({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal }),
-    }).catch(() => {}))
+    }))
     if (custPhone) {
       waitUntil(sendSMS(env, {
         to: custPhone,
@@ -203,7 +220,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   // ── Cancelled ──────────────────────────────────────────────────────────────
   if (status === 'cancelled' && statusChanging && order.customer_email) {
-    waitUntil(sendEmail(env, {
+    queueCustomerEmail('cancelled', sendEmail(env, {
       to: order.customer_email,
       subject: isEs
         ? `❌ Pedido Cancelado — ${order.order_number}`
@@ -211,7 +228,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       html: isEs
         ? cancelledNotificationHtmlEs({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal })
         : cancelledNotificationHtml({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal }),
-    }).catch(() => {}))
+    }))
     if (custPhone) {
       waitUntil(sendSMS(env, {
         to: custPhone,
@@ -224,7 +241,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   // ── Refunded ───────────────────────────────────────────────────────────────
   if (status === 'refunded' && statusChanging && order.customer_email) {
-    waitUntil(sendEmail(env, {
+    queueCustomerEmail('refunded', sendEmail(env, {
       to: order.customer_email,
       subject: isEs
         ? `💸 Reembolso Emitido — ${order.order_number}`
@@ -232,7 +249,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       html: isEs
         ? refundedNotificationHtmlEs({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal, payment_method: order.payment_method })
         : refundedNotificationHtml({ order_number: order.order_number, customer_name: order.customer_name, items: custItems, total: custTotal, payment_method: order.payment_method }),
-    }).catch(() => {}))
+    }))
     if (custPhone) {
       waitUntil(sendSMS(env, {
         to: custPhone,
@@ -247,7 +264,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   if (status === 'shipped' && statusChanging && tracking?.number) {
     // Email notification — use waitUntil so Cloudflare keeps the Worker alive
     if (order.customer_email) {
-      waitUntil(sendEmail(env, {
+      queueCustomerEmail('shipped', sendEmail(env, {
         to: order.customer_email,
         subject: isEs
           ? `📦 Tu Pedido Ha Sido Enviado — ${order.order_number}`
@@ -269,7 +286,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
               carrier: tracking.carrier,
               tracking_number: tracking.number,
             }),
-      }).catch(() => {}))
+      }))
     }
 
     // SMS notification (if customer provided phone)

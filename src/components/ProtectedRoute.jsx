@@ -6,7 +6,7 @@ export default function ProtectedRoute({ children }) {
 
   // Logged-in admin browsing the storefront should pass through without
   // being redirected to the customer auth page.
-  const isAdmin = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('pl_admin')
+  const isAdmin = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('pl_admin_token')
 
   if (loading) {
     return (
