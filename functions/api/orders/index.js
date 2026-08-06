@@ -17,10 +17,11 @@ import { orderReceiptHtml, taxRecordHtml, orderCsvRow, buildCsv } from '../../_u
 
 export async function onRequestPost({ request, env, waitUntil }) {
   const authHeader = request.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
-
-  const payload = await verifyJWT(authHeader.slice(7), env)
-  if (!payload) return json({ error: 'Invalid or expired token' }, 401)
+  let payload = null
+  if (authHeader?.startsWith('Bearer ')) {
+    payload = await verifyJWT(authHeader.slice(7), env)
+    if (!payload) return json({ error: 'Invalid or expired token' }, 401)
+  }
 
   // Rate-limit order creation — 10 per 15 minutes per IP
   const rl = await checkRateLimit(env, rateLimitKey(request, 'order'))
@@ -29,13 +30,17 @@ export async function onRequestPost({ request, env, waitUntil }) {
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
 
-  const { items, payment_method, shipping, language, promo_code, partner_code, shipping_rate_id, local_delivery } = body
+  const { items, payment_method, shipping, language, promo_code, partner_code, shipping_rate_id, local_delivery, customer_email } = body
 
   if (!Array.isArray(items) || items.length === 0) return json({ error: 'Cart is empty' }, 400)
   if (items.length > 50) return json({ error: 'Too many items in cart' }, 400)
   if (!['zelle', 'cashapp', 'venmo'].includes(payment_method)) return json({ error: 'Invalid payment method' }, 400)
   if (!shipping?.address || !shipping?.city || !shipping?.state || !shipping?.zip) {
     return json({ error: 'Complete shipping address required' }, 400)
+  }
+  const guestEmail = String(customer_email || '').trim().toLowerCase()
+  if (!payload && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+    return json({ error: 'Valid email required for guest checkout' }, 400)
   }
 
   // ── Validate basic item shape, then fetch authoritative prices + stock ──────
@@ -123,6 +128,9 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   const subtotal = Number(dbItems.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(2))
+  if (!payload && dbItems.some(i => i.department === 'Peptides')) {
+    return json({ error: 'Login is required for Peptides checkout' }, 401)
+  }
   // Only non-case items are eligible for promo discounts
   const discountableSubtotal = Number(dbItems.reduce((sum, i) => sum + (i.no_discount ? 0 : i.price * i.qty), 0).toFixed(2))
 
@@ -130,6 +138,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   // Has this user already redeemed this code on a past order? Past orders store
   // applied codes comma-separated, so split + match each token precisely.
   const usedByUserBefore = async (code) => {
+    if (!payload) return false
     const { results } = await env.DB.prepare(
       'SELECT promo_code FROM orders WHERE user_id = ? AND promo_code IS NOT NULL'
     ).bind(payload.sub).all()
@@ -149,8 +158,9 @@ export async function onRequestPost({ request, env, waitUntil }) {
     if (promo.expires_at && promo.expires_at < now) return null
     if (promo.max_uses > 0 && promo.used_count >= promo.max_uses) return null
     if (promo.min_order_amount > 0 && discountableSubtotal < promo.min_order_amount) return null
-    // One-use-per-customer enforcement (tracked by user login)
-    if (promo.one_use_per_user && await usedByUserBefore(promo.code)) return null
+    // One-use-per-customer enforcement is tied to verified accounts.
+    // Guest checkouts cannot redeem account-limited codes.
+    if (promo.one_use_per_user && (!payload || await usedByUserBefore(promo.code))) return null
     return promo
   }
 
@@ -228,8 +238,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
     venmo: env.VENMO_HANDLE ?? 'Contact us for payment info',
   }
 
-  const customerEmail = payload.email || ''
-  const customerName = payload.name || ''
+  const customerEmail = payload?.email || guestEmail
+  const customerName = payload?.name || String(shipping?.name || '').trim()
 
   // ── Atomically reserve stock BEFORE creating the order ─────────────────────
   // A conditional decrement (stock_qty >= qty) only applies when enough stock
@@ -269,7 +279,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       tax_rate, tax_amount, order_total, local_delivery
     ) VALUES ('TEMP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    payload.sub, customerName, customerEmail,
+    payload?.sub || null, customerName, customerEmail,
     JSON.stringify(dbItems), JSON.stringify(shipping), subtotal, payment_method,
     applied_promo_code, discount_amount, shipping_rate_name, shipping_cost,
     tax_rate, tax_amount, order_total, isLocalDelivery ? 1 : 0

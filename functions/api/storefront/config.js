@@ -1,8 +1,6 @@
 import { corsHeaders, json } from '../../_utils/cors.js'
-import { isContentAuthed } from '../../_utils/contentAuth.js'
 
 export async function onRequestGet({ request, env }) {
-  if (!(await isContentAuthed(request, env))) return json({ error: 'Unauthorized' }, 401)
   const [{ results: rates }, { results: settingsRows }] = await Promise.all([
     env.DB.prepare(
       'SELECT id, name, price, min_days, max_days FROM shipping_rates WHERE is_active = 1 ORDER BY display_order ASC, id ASC'

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import CartSidebar from '../components/CartSidebar'
 import Footer from '../components/Footer'
@@ -41,6 +41,8 @@ function SuggestionBox() {
       setStatus('error')
     }
   }
+
+  if (!token) return null
 
   return (
     <div className="mb-6">
@@ -111,6 +113,7 @@ function SuggestionBox() {
 export default function ShopPage() {
   const { products, showWasPrice, loading, error: catalogError } = useProductCatalog()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const initialDept = DEPARTMENTS.includes(searchParams.get('dept')) ? searchParams.get('dept') : 'All'
   const [department, setDepartment] = useState(initialDept)
   const [category, setCategory] = useState('All')
@@ -120,6 +123,9 @@ export default function ShopPage() {
   const [coaDocs, setCoaDocs] = useState([])
   const [peptideAcked, setPeptideAcked] = useState(hasAckedPeptideGate())
   const t = useT()
+  const { user, loading: authLoading } = useAuth()
+  const isAdmin = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('pl_admin_token')
+  const canViewPeptides = !!user || isAdmin
   const error = catalogError ? t.shop.loadError : ''
 
   // Re-check whenever the department filter lands on Peptides — a login/logout
@@ -127,6 +133,13 @@ export default function ShopPage() {
   useEffect(() => {
     if (department === 'Peptides') setPeptideAcked(hasAckedPeptideGate())
   }, [department])
+
+  useEffect(() => {
+    if (!authLoading && department === 'Peptides' && !canViewPeptides) {
+      selectDepartment('All')
+      navigate('/auth')
+    }
+  }, [authLoading, department, canViewPeptides])
 
   useEffect(() => {
     fetch('/api/coa', { headers: authHeaders() })
@@ -140,6 +153,10 @@ export default function ShopPage() {
 
   // Selecting a department resets the sub-category and syncs the URL (?dept=)
   const selectDepartment = (dep) => {
+    if (dep === 'Peptides' && !canViewPeptides) {
+      navigate('/auth')
+      return
+    }
     setDepartment(dep)
     setCategory('All')
     const next = new URLSearchParams(searchParams)
@@ -196,7 +213,7 @@ export default function ShopPage() {
         />
       )}
 
-      {department === 'Peptides' && !peptideAcked && (
+      {department === 'Peptides' && canViewPeptides && !peptideAcked && (
         <PeptideGate
           onAgree={() => setPeptideAcked(true)}
           onDecline={() => selectDepartment('All')}

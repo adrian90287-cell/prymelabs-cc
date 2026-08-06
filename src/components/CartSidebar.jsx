@@ -22,8 +22,9 @@ export default function CartSidebar() {
   }
 
   const handleCheckout = () => {
+    const hasPeptides = items.some(item => (item.department || 'Peptides') === 'Peptides')
     setIsOpen(false)
-    navigate(user ? '/checkout' : '/auth')
+    navigate(!user && hasPeptides ? '/auth' : '/checkout')
   }
 
   return (

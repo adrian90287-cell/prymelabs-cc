@@ -6,6 +6,7 @@ import Footer from '../components/Footer'
 import { ProductGrid } from '../components/ProductGrid'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import { useT } from '../context/LanguageContext'
+import { useAuth } from '../context/AuthContext'
 import { authHeaders } from '../lib/authHeaders'
 import { useProductCatalog } from '../hooks/useProductCatalog'
 import {
@@ -37,6 +38,7 @@ export default function CollectionPage() {
   const { deptSlug, colSlug } = useParams()
   const navigate = useNavigate()
   const t = useT()
+  const { user, loading: authLoading } = useAuth()
   const { products, showWasPrice, loading } = useProductCatalog()
   const [coaDocs, setCoaDocs] = useState([])
   const [search, setSearch] = useState('')
@@ -44,6 +46,8 @@ export default function CollectionPage() {
 
   const department = departmentFromSlug(deptSlug || '')
   const collection = department && colSlug ? collectionFromSlug(department, colSlug) : null
+  const isAdmin = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('pl_admin_token')
+  const canViewPeptides = !!user || isAdmin
 
   // Re-check the ack whenever we land on a Peptides route — sessionStorage can
   // have been cleared by a login/logout since this component last mounted.
@@ -63,6 +67,13 @@ export default function CollectionPage() {
     if (!loading && !department) navigate('/shop', { replace: true })
   }, [loading, department, navigate])
 
+  // Peptides stay restricted even though the rest of the storefront is public.
+  useEffect(() => {
+    if (!authLoading && department === 'Peptides' && !canViewPeptides) {
+      navigate('/auth', { replace: true })
+    }
+  }, [authLoading, department, canViewPeptides, navigate])
+
   // Clear search when navigating to a different department/collection
   useEffect(() => { setSearch('') }, [deptSlug, colSlug])
   if (!department) {
@@ -74,7 +85,25 @@ export default function CollectionPage() {
     )
   }
 
-  if (department === 'Peptides' && !peptideAcked) {
+  if (department === 'Peptides' && authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950"><Navbar /><CartSidebar />
+        <div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (department === 'Peptides' && !canViewPeptides) {
+    return (
+      <div className="min-h-screen bg-zinc-950"><Navbar /><CartSidebar />
+        <div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (department === 'Peptides' && canViewPeptides && !peptideAcked) {
     return (
       <div className="min-h-screen bg-zinc-950">
         <Navbar />

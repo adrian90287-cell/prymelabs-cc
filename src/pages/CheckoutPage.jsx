@@ -284,6 +284,7 @@ function ReviewStep({ items, shipping, method, selectedRate, appliedPromo, appli
 export default function CheckoutPage() {
   const [step, setStep] = useState('form') // 'form' | 'review'
   const [method, setMethod] = useState('')
+  const [guestEmail, setGuestEmail] = useState('')
   const [shipping, setShipping] = useState({ name: '', address: '', address2: '', city: '', state: '', zip: '', country: 'US', phone: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -307,10 +308,12 @@ export default function CheckoutPage() {
   const orderPlacedRef = useRef(false) // guards the empty-cart redirect after a successful order
 
   const { items, total, clearCart, reconcilePrices } = useCart()
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { lang } = useLanguage()
   const navigate = useNavigate()
   const t = useT()
+  const hasPeptides = items.some(item => (item.department || 'Peptides') === 'Peptides')
+  const isGuest = !token
 
   // Re-price the cart against the live product feed before any total is computed
   // or the order is submitted. The cart persists in localStorage, so without this
@@ -321,6 +324,14 @@ export default function CheckoutPage() {
       .then(d => reconcilePrices(d.products || []))
       .catch(() => {})
   }, [reconcilePrices])
+
+  useEffect(() => {
+    if (!token && hasPeptides) navigate('/auth', { replace: true })
+  }, [token, hasPeptides, navigate])
+
+  useEffect(() => {
+    if (user?.email) setGuestEmail(user.email)
+  }, [user?.email])
 
   useEffect(() => {
     fetch('/api/storefront/config', { headers: authHeaders() })
@@ -492,6 +503,10 @@ export default function CheckoutPage() {
   const handleReview = () => {
     setError('')
     if (!method) { setError(t.checkout.selectPayment); return }
+    if (isGuest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) {
+      setError(t.checkout.emailRequired || 'Please enter a valid email address')
+      return
+    }
     if (!shipping.name?.trim()) { setError(t.checkout.nameRequired); return }
     if (!shipping.address?.trim() || !shipping.city?.trim() || !shipping.state || !shipping.zip?.trim()) {
       setError(t.checkout.shippingRequired); return
@@ -508,11 +523,14 @@ export default function CheckoutPage() {
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: token
+          ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+          : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map(i => ({ product_id: i.id, name: i.name, size: i.size, price: i.price, qty: i.qty })),
           payment_method: method,
           shipping,
+          customer_email: isGuest ? guestEmail.trim().toLowerCase() : undefined,
           language: lang,
           promo_code: appliedPromo?.code || null,
           partner_code: appliedAffiliate?.code || null,
@@ -636,15 +654,17 @@ export default function CheckoutPage() {
             </div>
 
             {/* Discount Codes */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-5 space-y-4">
-              <CodeField label={t.checkout.promoCode} codeType="promo" subtotal={discountableSubtotal} token={token} t={t}
-                applied={appliedPromo} onApply={setAppliedPromo} onRemove={() => setAppliedPromo(null)} />
-              <CodeField label={t.checkout.partnerCode} codeType="partner" subtotal={discountableSubtotal} token={token} t={t}
-                applied={appliedAffiliate} onApply={setAppliedAffiliate} onRemove={() => setAppliedAffiliate(null)} />
-              {items.some(i => i.no_discount) && (
-                <p className="text-zinc-500 text-xs">Case / wholesale items are already discounted and aren't eligible for promo codes.</p>
-              )}
-            </div>
+            {!isGuest && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-5 space-y-4">
+                <CodeField label={t.checkout.promoCode} codeType="promo" subtotal={discountableSubtotal} token={token} t={t}
+                  applied={appliedPromo} onApply={setAppliedPromo} onRemove={() => setAppliedPromo(null)} />
+                <CodeField label={t.checkout.partnerCode} codeType="partner" subtotal={discountableSubtotal} token={token} t={t}
+                  applied={appliedAffiliate} onApply={setAppliedAffiliate} onRemove={() => setAppliedAffiliate(null)} />
+                {items.some(i => i.no_discount) && (
+                  <p className="text-zinc-500 text-xs">Case / wholesale items are already discounted and aren't eligible for promo codes.</p>
+                )}
+              </div>
+            )}
 
             {/* Local Delivery Option */}
             {localDelivery.enabled && (
@@ -721,6 +741,15 @@ export default function CheckoutPage() {
                     All orders ship with <span className="text-white font-semibold">live tracking</span> so you can follow your package every step of the way. Estimated delivery times are provided by the carrier and may vary due to weather, holidays, or high-volume periods. Rest assured — we process and ship orders promptly, and you'll receive your tracking information as soon as your order is on its way. 📦
                   </p>
                 </div>
+              </div>
+            )}
+
+            {isGuest && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-5">
+                <h2 className="text-white font-bold mb-1">{t.checkout.contactInfo || 'Contact Information'}</h2>
+                <p className="text-zinc-500 text-xs mb-4">{t.checkout.guestCheckoutNote || 'No account needed for non-peptide orders. We’ll send your order confirmation here.'}</p>
+                <label className="block text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-1.5">{t.checkout.email || 'Email Address'}</label>
+                <input type="email" placeholder="you@example.com" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} required className={inp} />
               </div>
             )}
 

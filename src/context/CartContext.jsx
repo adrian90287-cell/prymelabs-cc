@@ -61,9 +61,10 @@ export function CartProvider({ children }) {
         const price = Number(p.price)
         const compare_at_price = p.compare_at_price != null ? Number(p.compare_at_price) : null
         const no_discount = p.no_discount ?? i.no_discount
-        if (i.price === price && i.compare_at_price === compare_at_price && i.no_discount === no_discount) return i
+        const department = p.department ?? i.department
+        if (i.price === price && i.compare_at_price === compare_at_price && i.no_discount === no_discount && i.department === department) return i
         changed = true
-        return { ...i, price, compare_at_price, no_discount, stock_qty: p.stock_qty ?? i.stock_qty, in_stock: p.in_stock ?? i.in_stock }
+        return { ...i, price, compare_at_price, no_discount, department, stock_qty: p.stock_qty ?? i.stock_qty, in_stock: p.in_stock ?? i.in_stock }
       })
       return changed ? next : prev
     })

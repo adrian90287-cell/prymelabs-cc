@@ -1,5 +1,4 @@
 import { corsHeaders, json } from '../../_utils/cors.js'
-import { isContentAuthed } from '../../_utils/contentAuth.js'
 
 // Home-page department hero images. Kept on its own endpoint (only the home page
 // fetches it) so these — potentially large — images never weigh down the global
@@ -12,7 +11,6 @@ const KEYS = {
 }
 
 export async function onRequestGet({ request, env }) {
-  if (!(await isContentAuthed(request, env))) return json({ error: 'Unauthorized' }, 401)
   const { results } = await env.DB.prepare(
     "SELECT key, value FROM settings WHERE key IN ('home_hero_peptides','home_hero_supplements','home_hero_skincare','home_hero_apparel')"
   ).all()

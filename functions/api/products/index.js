@@ -4,8 +4,9 @@ import { resolveSaleConfig } from '../../_utils/sale.js';
 import { computeDisplayPricing } from '../../_utils/pricing.js';
 
 export async function onRequestGet({ request, env }) {
-  // Catalog + prices are gated — only logged-in customers (or admin) may read.
-  if (!(await isContentAuthed(request, env))) return json({ error: 'Unauthorized' }, 401);
+  // Public visitors may browse the general storefront. The Peptides department
+  // remains restricted: only logged-in customers or admin preview may read it.
+  const authed = await isContentAuthed(request, env);
 
   const [{ results: products }, { results: settingsRows }] = await Promise.all([
     env.DB.prepare(
@@ -43,7 +44,11 @@ export async function onRequestGet({ request, env }) {
   // Look up table so a case can read its parent single's stock
   const byId = new Map((products || []).map(p => [p.id, p]));
 
-  const finalProducts = (products || []).map(p => {
+  const visibleProducts = authed
+    ? (products || [])
+    : (products || []).filter(p => (p.department || 'Peptides') !== 'Peptides');
+
+  const finalProducts = visibleProducts.map(p => {
     const isBundle = p.bundle_of_product_id != null;
     const { price, compare_at_price, no_discount: noDiscount } = computeDisplayPricing(p, {
       masterAdjust, saleConfig, wasAmountEnabled, wasAmount,
@@ -82,7 +87,7 @@ export async function onRequestGet({ request, env }) {
     };
   });
 
-  return json({ products: finalProducts, show_was_price: showWasPrice });
+  return json({ products: finalProducts, show_was_price: showWasPrice, restricted: authed ? [] : ['Peptides'] });
 }
 
 export async function onRequestOptions() {

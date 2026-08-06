@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { invalidateProductCatalog } from '../hooks/useProductCatalog'
 
 const AuthContext = createContext(null)
 
@@ -41,6 +42,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = (tokenValue, userValue) => {
+    invalidateProductCatalog()
     localStorage.setItem('pl_token', tokenValue)
     localStorage.setItem('pl_user', JSON.stringify(userValue))
     sessionStorage.removeItem('pl_peptide_ack')
@@ -54,6 +56,7 @@ export function AuthProvider({ children }) {
   }
 
   const logout = () => {
+    invalidateProductCatalog()
     localStorage.removeItem('pl_token')
     localStorage.removeItem('pl_user')
     sessionStorage.removeItem('pl_peptide_ack')

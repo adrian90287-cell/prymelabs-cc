@@ -42,15 +42,15 @@ export default function App() {
             <ScrollToTop />
             <Suspense fallback={<PageFallback />}>
               <Routes>
-                <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+                <Route path="/" element={<HomePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/admin" element={<AdminPage />} />
-                <Route path="/shop" element={<ProtectedRoute><ShopPage /></ProtectedRoute>} />
-                <Route path="/collections/:deptSlug" element={<ProtectedRoute><CollectionPage /></ProtectedRoute>} />
-                <Route path="/collections/:deptSlug/:colSlug" element={<ProtectedRoute><CollectionPage /></ProtectedRoute>} />
-                <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-                <Route path="/order-confirmation" element={<ProtectedRoute><OrderConfirmPage /></ProtectedRoute>} />
+                <Route path="/shop" element={<ShopPage />} />
+                <Route path="/collections/:deptSlug" element={<CollectionPage />} />
+                <Route path="/collections/:deptSlug/:colSlug" element={<CollectionPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/order-confirmation" element={<OrderConfirmPage />} />
                 <Route path="/orders" element={<ProtectedRoute><OrderHistoryPage /></ProtectedRoute>} />
                 <Route path="/track" element={<OrderTrackingPage />} />
                 <Route path="/compliance" element={<CompliancePage />} />
