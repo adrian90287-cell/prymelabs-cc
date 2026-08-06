@@ -68,7 +68,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const cols = ['status = ?']
   const params = [status]
   if (timestampCol) { cols.push(`${timestampCol} = ?`); params.push(now) }
-  if (trackingStr != null) { cols.push('tracking_json = ?'); params.push(trackingStr) }
+  if (trackingStr != null) {
+    cols.push('tracking_json = ?'); params.push(trackingStr)
+    // Kept in sync for the webhooks' indexed lookup (see migrations/tracking_index.sql)
+    cols.push('tracking_number = ?'); params.push(tracking.number || null)
+    cols.push('uber_delivery_id = ?'); params.push(tracking.uber_delivery_id || null)
+  }
   if (notes != null) { cols.push('notes = ?'); params.push(notes) }
   if (ready_after != null) { cols.push('ready_after = ?'); params.push(ready_after) }
   params.push(order_id)

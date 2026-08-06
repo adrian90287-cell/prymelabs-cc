@@ -52,18 +52,26 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   if (!deliveryId) return json({ ok: true }) // ignore malformed events
 
-  // Find order by uber_delivery_id stored in tracking_json
-  // D1 can't query JSON fields natively, so we search recent shipped orders
-  const { results: candidates } = await env.DB.prepare(
-    `SELECT * FROM orders WHERE tracking_json IS NOT NULL AND status IN ('shipped','fulfilled') ORDER BY created_at DESC LIMIT 200`
-  ).all()
+  // Find the order by its indexed uber_delivery_id first (fast, exact). Falls
+  // back to the old scan + JS exact-match for any order predating the
+  // backfill (migrations/tracking_index.sql) — belt and suspenders so a
+  // webhook can never silently miss an order either way.
+  let order = await env.DB.prepare(
+    `SELECT * FROM orders WHERE uber_delivery_id = ? LIMIT 1`
+  ).bind(deliveryId).first()
 
-  const order = (candidates || []).find(o => {
-    try {
-      const t = JSON.parse(o.tracking_json || '{}')
-      return t.uber_delivery_id === deliveryId
-    } catch { return false }
-  })
+  if (!order) {
+    const { results: candidates } = await env.DB.prepare(
+      `SELECT * FROM orders WHERE tracking_json IS NOT NULL AND status IN ('shipped','fulfilled') ORDER BY created_at DESC LIMIT 200`
+    ).all()
+
+    order = (candidates || []).find(o => {
+      try {
+        const t = JSON.parse(o.tracking_json || '{}')
+        return t.uber_delivery_id === deliveryId
+      } catch { return false }
+    })
+  }
 
   if (!order) return json({ ok: true }) // not our order
 

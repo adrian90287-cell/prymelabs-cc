@@ -62,18 +62,26 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const code = (tracker.tracking_code || '').trim()
   if (!code) return json({ ok: true, ignored: 'no_tracking_code' })
 
-  // Find the order whose stored tracking number matches this tracking code.
-  // D1 can't query JSON natively, so LIKE-narrow then exact-match in JS.
-  const { results: candidates } = await env.DB.prepare(
-    `SELECT * FROM orders
-     WHERE deleted_at IS NULL AND tracking_json IS NOT NULL
-       AND tracking_json LIKE '%' || ? || '%'
-     ORDER BY created_at DESC LIMIT 25`
-  ).bind(code).all()
+  // Find the order by its indexed tracking_number first (fast, exact). Falls
+  // back to the old LIKE-scan + JS exact-match for any order predating the
+  // tracking_number backfill (migrations/tracking_index.sql) — belt and
+  // suspenders so a webhook can never silently miss an order either way.
+  let order = await env.DB.prepare(
+    `SELECT * FROM orders WHERE deleted_at IS NULL AND tracking_number = ? LIMIT 1`
+  ).bind(code).first()
 
-  const order = (candidates || []).find(o => {
-    try { return (JSON.parse(o.tracking_json || '{}').number || '').trim() === code } catch { return false }
-  })
+  if (!order) {
+    const { results: candidates } = await env.DB.prepare(
+      `SELECT * FROM orders
+       WHERE deleted_at IS NULL AND tracking_json IS NOT NULL
+         AND tracking_json LIKE '%' || ? || '%'
+       ORDER BY created_at DESC LIMIT 25`
+    ).bind(code).all()
+
+    order = (candidates || []).find(o => {
+      try { return (JSON.parse(o.tracking_json || '{}').number || '').trim() === code } catch { return false }
+    })
+  }
 
   if (!order) return json({ ok: true, ignored: 'no_matching_order' })
 

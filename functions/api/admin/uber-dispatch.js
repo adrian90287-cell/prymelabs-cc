@@ -112,8 +112,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   await env.DB.prepare(
-    `UPDATE orders SET status = 'shipped', shipped_at = ?, tracking_json = ?, tracking_status = 'in_transit' WHERE id = ?`
-  ).bind(now, JSON.stringify(trackingObj), order.id).run()
+    `UPDATE orders SET status = 'shipped', shipped_at = ?, tracking_json = ?, tracking_status = 'in_transit', tracking_number = ?, uber_delivery_id = ? WHERE id = ?`
+  ).bind(now, JSON.stringify(trackingObj), trackingObj.number, trackingObj.uber_delivery_id, order.id).run()
 
   // Notify customer
   const firstName = (order.customer_name || '').split(' ')[0]
