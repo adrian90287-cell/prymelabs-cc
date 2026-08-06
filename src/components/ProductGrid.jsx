@@ -350,13 +350,18 @@ export function ProductGroupCard({ group, onOpenModal, showWasPrice = true }) {
 
 // Convenience grid: groups a flat product list by name and renders cards + a
 // shared product modal. Used by both the Home page tabs and any simple listing.
-export function ProductGrid({ products, coaDocs = [], showWasPrice = true, emptyLabel }) {
+export function ProductGrid({ products, coaDocs = [], showWasPrice = true, emptyLabel, emptyHint }) {
   const [modal, setModal] = useState(null)
   const t = useT()
   const groups = groupByName(products).sort((a, b) => (a[0].name || '').localeCompare(b[0].name || ''))
 
   if (groups.length === 0) {
-    return <div className="text-center py-20 text-zinc-500 text-sm">{emptyLabel || t.shop.noProducts}</div>
+    return (
+      <div className="text-center py-20">
+        <p className="text-zinc-400 text-lg font-semibold">{emptyLabel || t.shop.noProducts}</p>
+        {emptyHint && <p className="text-zinc-600 text-sm mt-1">{emptyHint}</p>}
+      </div>
+    )
   }
 
   return (

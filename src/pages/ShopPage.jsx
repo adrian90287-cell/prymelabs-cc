@@ -197,6 +197,8 @@ export default function ShopPage() {
   }
 
   const inStockCount = allGroups.filter(g => g.some(v => v.in_stock !== 0 && v.in_stock !== false)).length
+  const showComingSoon = !search.trim() && department !== 'All' && department !== 'Peptides'
+  const departmentName = t.shop.departmentNames?.[department] || department
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -306,8 +308,8 @@ export default function ShopPage() {
 
         {!loading && !error && groups.length === 0 && (
           <div className="text-center py-24">
-            <p className="text-zinc-400 text-lg font-semibold">{search.trim() ? t.shop.noResults : t.shop.noProducts}</p>
-            {!search.trim() && <p className="text-zinc-600 text-sm mt-1">{t.shop.checkBack}</p>}
+            <p className="text-zinc-400 text-lg font-semibold">{search.trim() ? t.shop.noResults : showComingSoon ? t.home.emptyDept(departmentName) : t.shop.noProducts}</p>
+            {!search.trim() && <p className="text-zinc-600 text-sm mt-1">{showComingSoon ? t.home.emptyDeptHint : t.shop.checkBack}</p>}
           </div>
         )}
 

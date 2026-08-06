@@ -43,7 +43,8 @@ export const translations = {
       shopPrefix: 'Shop',
       products: (n) => `${n} ${n === 1 ? 'product' : 'products'}`,
       researchStrip: '⚠ All products are strictly for laboratory & research use only — not for human consumption.',
-      emptyDept: (dep) => `No ${dep} products in stock yet — check back soon.`,
+      emptyDept: (dep) => `New ${dep} products are on the way.`,
+      emptyDeptHint: 'Come back soon as products get released.',
       departmentBlurbs: {
         'Peptides': 'Research peptides, GLP analogs & recovery compounds',
         'Health & Wellness': 'Daily wellness, hydration, recovery & performance',
@@ -362,7 +363,8 @@ export const translations = {
       shopPrefix: 'Comprar',
       products: (n) => `${n} ${n === 1 ? 'producto' : 'productos'}`,
       researchStrip: '⚠ Todos los productos son estrictamente para uso de laboratorio e investigación — no para consumo humano.',
-      emptyDept: (dep) => `Aún no hay productos de ${dep} en stock — vuelve pronto.`,
+      emptyDept: (dep) => `Nuevos productos de ${dep} vienen en camino.`,
+      emptyDeptHint: 'Vuelve pronto a medida que se lancen nuevos productos.',
       departmentBlurbs: {
         'Peptides': 'Péptidos de investigación, análogos GLP y compuestos de recuperación',
         'Health & Wellness': 'Bienestar diario, hidratación, recuperación y rendimiento',

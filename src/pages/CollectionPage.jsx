@@ -119,6 +119,7 @@ export default function CollectionPage() {
   const deptName = t.shop.departmentNames?.[department] || department
   const colName  = collection ? (t.shop.departmentNames?.[collection] || collection) : null
   const deptSubtitle = t.home.departmentBlurbs?.[department] || t.shop.subtitle
+  const showComingSoon = !search.trim() && department !== 'Peptides'
 
   let shown = filterByCollection(products, department, collection).filter(inStock)
   if (search.trim()) {
@@ -213,7 +214,13 @@ export default function CollectionPage() {
         {loading ? (
           <div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
         ) : (
-          <ProductGrid products={shown} coaDocs={coaDocs} showWasPrice={showWasPrice} emptyLabel={search.trim() ? t.shop.noResults : t.collections.empty} />
+          <ProductGrid
+            products={shown}
+            coaDocs={coaDocs}
+            showWasPrice={showWasPrice}
+            emptyLabel={search.trim() ? t.shop.noResults : showComingSoon ? t.home.emptyDept(deptName) : t.collections.empty}
+            emptyHint={showComingSoon ? t.home.emptyDeptHint : undefined}
+          />
         )}
       </main>
 
