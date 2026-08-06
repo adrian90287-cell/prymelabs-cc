@@ -102,12 +102,13 @@ function carrierLink(carrier, number) {
   return fn && number ? fn(number) : null
 }
 // Top-level storefront departments — drive the home-page tabs (see migrate_v22.sql)
-const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Peptides']
+const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 'Peptides']
 // Categories offered per department in the product form (the storefront sub-filter).
 const CATEGORIES_BY_DEPT = {
   'Peptides': ['GLP Research', 'Recovery & Repair', 'Longevity Research', 'Neural & Cognitive', 'Peptide Hormones', 'Research Supplies'],
   'Health & Wellness': ['Vitamins & Minerals', 'NAD+ & Longevity', 'Hydration & Electrolytes', 'Energy & Performance', 'Sleep & Recovery', 'Digestive Health', 'Immune Support', 'Protein & Fitness', 'General Wellness'],
   'Beauty & Grooming': ['Skincare', 'Hair Care', 'Hair Styling', 'Beard Care', 'Body Care', 'Cleansers', 'Toners', 'Serums', 'Moisturizers', 'Face Creams', 'Soaps', 'Grooming Tools', 'Kits & Bundles'],
+  'Apparel & Gear': ['Apparel', 'Drinkware', 'Gym Accessories', 'Bags & Carry', 'Stickers & Extras'],
 }
 const categoriesFor = (dept) => CATEGORIES_BY_DEPT[dept] || CATEGORIES_BY_DEPT['Peptides']
 // Flat union — used by the inventory Category filter dropdown.
@@ -3083,7 +3084,7 @@ const EMPTY_BANNER = { banner_enabled: '0', banner_pre_text: "Don't forget to us
 
 // Department → settings key for its home-page hero photo. (Underlying setting
 // key names are kept stable so previously uploaded photos are preserved.)
-const HERO_KEY = { 'Peptides': 'home_hero_peptides', 'Health & Wellness': 'home_hero_supplements', 'Beauty & Grooming': 'home_hero_skincare' }
+const HERO_KEY = { 'Peptides': 'home_hero_peptides', 'Health & Wellness': 'home_hero_supplements', 'Beauty & Grooming': 'home_hero_skincare', 'Apparel & Gear': 'home_hero_apparel' }
 
 // Compact hero-image control for a single department, shown inline in the
 // Products tab when that department is selected. Stored in settings and served

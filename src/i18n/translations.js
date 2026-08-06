@@ -48,6 +48,7 @@ export const translations = {
         'Peptides': 'Research peptides, GLP analogs & recovery compounds',
         'Health & Wellness': 'Daily wellness, hydration, recovery & performance',
         'Beauty & Grooming': 'Skin, hair, beard & body care essentials',
+        'Apparel & Gear': 'Hoodies, shirts, drinkware & everyday Pryme gear',
       },
     },
     collections: {
@@ -134,6 +135,7 @@ export const translations = {
         'Peptides':          'Peptides',
         'Health & Wellness': 'Health & Wellness',
         'Beauty & Grooming': 'Beauty & Grooming',
+        'Apparel & Gear':    'Apparel & Gear',
       },
       categoryNames: {
         'GLP Research':        'GLP Research',
@@ -142,6 +144,11 @@ export const translations = {
         'Neural & Cognitive':  'Neural & Cognitive',
         'Longevity Research':  'Longevity Research',
         'Research Supplies':   'Research Supplies',
+        'Apparel':             'Apparel',
+        'Drinkware':           'Drinkware',
+        'Gym Accessories':     'Gym Accessories',
+        'Bags & Carry':        'Bags & Carry',
+        'Stickers & Extras':   'Stickers & Extras',
       },
     },
     checkout: {
@@ -356,6 +363,7 @@ export const translations = {
         'Peptides': 'Péptidos de investigación, análogos GLP y compuestos de recuperación',
         'Health & Wellness': 'Bienestar diario, hidratación, recuperación y rendimiento',
         'Beauty & Grooming': 'Cuidado de piel, cabello, barba y cuerpo',
+        'Apparel & Gear': 'Sudaderas, camisetas, vasos y accesorios Pryme',
       },
     },
     collections: {
@@ -442,6 +450,7 @@ export const translations = {
         'Peptides':          'Péptidos',
         'Health & Wellness': 'Salud y Bienestar',
         'Beauty & Grooming': 'Belleza y Cuidado Personal',
+        'Apparel & Gear':    'Ropa y Accesorios',
       },
       categoryNames: {
         'GLP Research':        'Investigación GLP',
@@ -450,6 +459,11 @@ export const translations = {
         'Neural & Cognitive':  'Neural y Cognitivo',
         'Longevity Research':  'Investigación de Longevidad',
         'Research Supplies':   'Suministros de Investigación',
+        'Apparel':             'Ropa',
+        'Drinkware':           'Vasos y Termos',
+        'Gym Accessories':     'Accesorios de Gimnasio',
+        'Bags & Carry':        'Bolsas y Transporte',
+        'Stickers & Extras':   'Stickers y Extras',
       },
     },
     checkout: {

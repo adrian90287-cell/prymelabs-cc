@@ -8,12 +8,13 @@ const KEYS = {
   'Peptides':          'home_hero_peptides',
   'Health & Wellness': 'home_hero_supplements',
   'Beauty & Grooming': 'home_hero_skincare',
+  'Apparel & Gear':    'home_hero_apparel',
 }
 
 export async function onRequestGet({ request, env }) {
   if (!(await isContentAuthed(request, env))) return json({ error: 'Unauthorized' }, 401)
   const { results } = await env.DB.prepare(
-    "SELECT key, value FROM settings WHERE key IN ('home_hero_peptides','home_hero_supplements','home_hero_skincare')"
+    "SELECT key, value FROM settings WHERE key IN ('home_hero_peptides','home_hero_supplements','home_hero_skincare','home_hero_apparel')"
   ).all()
   const map = {}
   for (const r of (results || [])) map[r.key] = r.value

@@ -7,7 +7,7 @@
 // Backward compatibility: if `sale_config` isn't set, we derive it from the old
 // single-amount model (sale_mode_enabled + sale_discount_amount + sale_departments).
 
-export const SALE_DEPARTMENTS = ['Peptides', 'Health & Wellness', 'Beauty & Grooming']
+export const SALE_DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 'Peptides']
 
 // cfg is a plain { key: value } map of settings.
 export function resolveSaleConfig(cfg = {}) {

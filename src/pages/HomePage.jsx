@@ -18,8 +18,8 @@ function StatPill({ icon, label }) {
   )
 }
 
-// Home-page departments, Peptides first (the populated line)
-const HOME_DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Peptides']
+// Home-page departments, in storefront display order.
+const HOME_DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 'Peptides']
 
 // Large, image-forward entry card. Shows a hero photo when configured, else a
 // clean branded panel in the existing theme (no external/stock imagery).

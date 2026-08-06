@@ -5,7 +5,7 @@ import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLi
 
 // Top-level storefront departments (home-page tabs). Everything defaults to
 // 'Peptides' — see migrate_v22.sql.
-const DEPARTMENTS = ['Peptides', 'Health & Wellness', 'Beauty & Grooming']
+const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 'Peptides']
 
 // Normalize a client-provided collections value to a clean JSON-array string.
 function normalizeCollections(value) {

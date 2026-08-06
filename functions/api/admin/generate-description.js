@@ -20,7 +20,7 @@ export async function onRequestPost({ request, env }) {
   const isTagline = field === 'tagline'
   const cat = category || ''
   const sizeStr = size ? ` (${size})` : ''
-  const dept = ['Peptides', 'Health & Wellness', 'Beauty & Grooming'].includes(department) ? department : 'Peptides'
+  const dept = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 'Peptides'].includes(department) ? department : 'Peptides'
 
   // Voice + rules per department so a cosmetic isn't described like a peptide.
   const STYLE = {
@@ -38,6 +38,11 @@ export async function onRequestPost({ request, env }) {
       system: 'You are a professional copywriter for a premium skincare, hair-care, and men\'s grooming brand. Write sensory, benefit-oriented copy tailored to the exact product type (skincare, hair care, hair styling, beard care, body care, cleansers, toners, serums, moisturizers, soaps). Describe texture, finish, feel, and who it\'s for. Avoid medical or therapeutic claims. Never repeat boilerplate.',
       tagline: `Write a single punchy one-line tagline (4-7 words, no ending period) for a "${cat || 'personal care'}" product called "${name}"${sizeStr}. Match the voice to a ${cat || 'grooming'} product (e.g. hold/texture for styling, hydration for moisturizers, conditioning for beard care, deep-clean for cleansers). Highlight ONE appealing benefit or feel. No medical claims. Output only the tagline.`,
       desc: `Write a concise 2-3 sentence product description for a "${cat || 'personal care'}" product called "${name}"${sizeStr}. Match the voice to a ${cat || 'grooming'} product — describe its texture/finish, the core benefit (e.g. hold, hydration, cleansing, softening, exfoliation), and how to use it. Sensory and appealing. No medical/therapeutic claims. Output only the description.`,
+    },
+    'Apparel & Gear': {
+      system: 'You are a professional copywriter for a premium fitness and lifestyle merchandise line. Write crisp, brand-forward copy for apparel, drinkware, gym accessories, bags, and everyday gear. Focus on fit, feel, durability, utility, and lifestyle appeal. Avoid medical, supplement, or research claims. Never repeat boilerplate.',
+      tagline: `Write a single punchy one-line tagline (4-7 words, no ending period) for a Pryme Labs "${cat || 'merchandise'}" product called "${name}"${sizeStr}. Highlight ONE appealing lifestyle, training, comfort, or utility benefit. Output only the tagline.`,
+      desc: `Write a concise 2-3 sentence product description for a Pryme Labs "${cat || 'merchandise'}" product called "${name}"${sizeStr}. Match the voice to the product type — apparel should mention fit/comfort, drinkware should mention daily use, gym accessories should mention training utility. Premium, clean, brand-forward. Output only the description.`,
     },
   }
   const style = STYLE[dept]
