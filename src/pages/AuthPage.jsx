@@ -11,6 +11,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [forgotView, setForgotView] = useState(false)
+  const [forgotMode, setForgotMode] = useState('password')
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotSent, setForgotSent] = useState(false)
   const { login } = useAuth()
@@ -49,20 +50,20 @@ export default function AuthPage() {
   const handleForgot = async (e) => {
     e.preventDefault()
     setError('')
-    if (!forgotEmail.trim()) { setError(t.auth.emailRequired); return }
+    if (!forgotEmail.trim()) { setError(forgotMode === 'username' ? 'Email or phone is required' : t.auth.emailRequired); return }
     setLoading(true)
     try {
       // Endpoint always returns ok (no account enumeration) — show the same message regardless
-      await fetch('/api/auth/forgot-password', {
+      await fetch(forgotMode === 'username' ? '/api/auth/forgot-username' : '/api/auth/forgot-password', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail.trim() }),
+        body: JSON.stringify(forgotMode === 'username' ? { identifier: forgotEmail.trim() } : { email: forgotEmail.trim() }),
       })
       setForgotSent(true)
     } catch { setError(t.auth.networkError) }
     finally { setLoading(false) }
   }
 
-  const openForgot = () => { setForgotView(true); setForgotSent(false); setError(''); setForgotEmail(form.email || '') }
+  const openForgot = (mode = 'password') => { setForgotMode(mode); setForgotView(true); setForgotSent(false); setError(''); setForgotEmail(form.email || '') }
   const closeForgot = () => { setForgotView(false); setForgotSent(false); setError('') }
 
   const inp = 'w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-sm'
@@ -91,13 +92,13 @@ export default function AuthPage() {
           {forgotView ? (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white font-bold text-lg">{t.auth.forgotTitle}</h2>
-                <p className="text-zinc-500 text-sm mt-1">{t.auth.forgotSubtitle}</p>
+                <h2 className="text-white font-bold text-lg">{forgotMode === 'username' ? 'Recover username' : t.auth.forgotTitle}</h2>
+                <p className="text-zinc-500 text-sm mt-1">{forgotMode === 'username' ? 'Enter the email or phone number on your account and we’ll send your username.' : 'Enter the email or phone number on your account and we’ll send a reset link.'}</p>
               </div>
               {forgotSent ? (
                 <>
                   <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-green-400 text-sm">
-                    {t.auth.resetLinkSent}
+                    {forgotMode === 'username' ? 'If an account exists for that email or phone, your username is on the way.' : t.auth.resetLinkSent}
                   </div>
                   <button onClick={closeForgot}
                     className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-colors">
@@ -107,14 +108,14 @@ export default function AuthPage() {
               ) : (
                 <form onSubmit={handleForgot} className="space-y-4">
                   <div>
-                    <label className="block text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-1.5">{t.auth.email}</label>
-                    <input type="email" placeholder="you@email.com" value={forgotEmail}
-                      onChange={e => setForgotEmail(e.target.value)} required autoComplete="email" className={inp} />
+                    <label className="block text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-1.5">Email or Phone</label>
+                    <input type="text" placeholder="you@email.com or phone" value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)} required autoComplete={forgotMode === 'username' ? 'username' : 'email'} className={inp} />
                   </div>
                   {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>}
                   <button type="submit" disabled={loading}
                     className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-blue-900/30">
-                    {loading ? t.auth.sending : t.auth.sendResetLink}
+                    {loading ? t.auth.sending : forgotMode === 'username' ? 'Send Username' : t.auth.sendResetLink}
                   </button>
                   <button type="button" onClick={closeForgot}
                     className="w-full text-center text-zinc-500 hover:text-white text-sm transition-colors">
@@ -197,10 +198,16 @@ export default function AuthPage() {
               ) : (tab === 'login' ? t.auth.signIn : t.auth.createAccount)}
             </button>
             {tab === 'login' && (
-              <button type="button" onClick={openForgot}
-                className="w-full text-center text-zinc-500 hover:text-blue-400 text-sm transition-colors">
-                {t.auth.forgotPassword}
-              </button>
+              <div className="space-y-2">
+                <button type="button" onClick={() => openForgot('password')}
+                  className="w-full text-center text-zinc-500 hover:text-blue-400 text-sm transition-colors">
+                  {t.auth.forgotPassword}
+                </button>
+                <button type="button" onClick={() => openForgot('username')}
+                  className="w-full text-center text-zinc-500 hover:text-blue-400 text-sm transition-colors">
+                  Forgot username?
+                </button>
+              </div>
             )}
           </form>
           </>

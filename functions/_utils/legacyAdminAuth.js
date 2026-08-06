@@ -5,6 +5,7 @@
 import { verifyAdminToken } from './adminAuth.js';
 import { constantTimeCompare } from './constantTime.js';
 import { checkAdminRateLimit, adminRateLimitKey } from './adminRateLimit.js';
+import { hasAdminPermission, inferAdminPermission } from './adminPermissions.js';
 
 export async function adminAuth(request, env) {
   // A valid JWT (the common case for an already-logged-in admin) never touches
@@ -12,6 +13,7 @@ export async function adminAuth(request, env) {
   // password scheme do, so normal admin usage is never throttled.
   const result = await verifyAdminToken(request, env);
   if (result.valid) return true;
+  if (result.status === 403) return false;
 
   // Below this point we're either brute-forcing the legacy password or
   // legitimately using it — throttle per-IP before even comparing, since
@@ -22,5 +24,23 @@ export async function adminAuth(request, env) {
 
   if (!env.ADMIN_PASSWORD) return false; // fail closed if unset, not "admin:undefined"
   const auth = request.headers.get('Authorization') || '';
-  return constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`);
+  if (constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`)) return true;
+  return false;
+}
+
+export async function adminAuthResult(request, env) {
+  const result = await verifyAdminToken(request, env);
+  if (result.valid) return result;
+
+  const rl = await checkAdminRateLimit(env, adminRateLimitKey(request, 'legacy-auth'));
+  if (rl.blocked) return { valid: false, error: 'Unauthorized', status: 401 };
+
+  const auth = request.headers.get('Authorization') || '';
+  if (env.ADMIN_PASSWORD && constantTimeCompare(auth, `Bearer admin:${env.ADMIN_PASSWORD}`)) {
+    const payload = { admin: true, owner: true, role: 'owner', permissions: ['*'] };
+    const required = inferAdminPermission(request);
+    if (required && !hasAdminPermission(payload, required)) return { valid: false, error: 'Forbidden', status: 403 };
+    return { valid: true, payload };
+  }
+  return { valid: false, error: 'Unauthorized', status: 401 };
 }

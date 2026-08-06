@@ -5,6 +5,7 @@
 import { verifyAdminToken } from '../../_utils/adminAuth.js';
 import { base32Encode, verifyTOTP } from '../../_utils/totpCore.js';
 import { logSecurityEvent, SECURITY_EVENT_TYPES } from '../../_utils/securityLog.js';
+import { ensureAdminUsersTable } from '../../_utils/adminPermissions.js';
 
 export async function onRequest({ request, env }) {
   if (request.method === 'POST') return handleEnable(request, env);
@@ -20,7 +21,10 @@ async function handleSetup(request, env) {
 
   const secretBytes = crypto.getRandomValues(new Uint8Array(20)); // 160-bit, standard TOTP secret length
   const secret = base32Encode(secretBytes);
-  const otpauthUrl = `otpauth://totp/Pryme%20Labs%20Admin?secret=${secret}&issuer=Pryme%20Labs`;
+  const label = authResult.payload.role === 'staff'
+    ? `Pryme Labs Admin:${authResult.payload.username || authResult.payload.name || 'staff'}`
+    : 'Pryme Labs Admin:Owner';
+  const otpauthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=Pryme%20Labs`;
 
   return new Response(JSON.stringify({ secret, otpauthUrl }), {
     status: 200,
@@ -47,10 +51,16 @@ async function handleEnable(request, env) {
     return new Response(JSON.stringify({ error: 'Invalid code — check your authenticator app and try again' }), { status: 401 });
   }
 
-  await env.DB.batch([
-    env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_2fa_secret', ?)").bind(secret),
-    env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_2fa_enabled', '1')"),
-  ]);
+  if (authResult.payload.role === 'staff' && authResult.payload.admin_user_id) {
+    await ensureAdminUsersTable(env);
+    await env.DB.prepare('UPDATE admin_users SET totp_secret = ?, totp_enabled = 1, updated_at = ? WHERE id = ?')
+      .bind(secret, Math.floor(Date.now() / 1000), authResult.payload.admin_user_id).run();
+  } else {
+    await env.DB.batch([
+      env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_2fa_secret', ?)").bind(secret),
+      env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_2fa_enabled', '1')"),
+    ]);
+  }
 
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,

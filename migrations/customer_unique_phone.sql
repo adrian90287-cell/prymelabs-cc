@@ -1,0 +1,6 @@
+-- Recommended after confirming existing data has no duplicate normalized phones:
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone) WHERE phone IS NOT NULL AND phone != '';
+--
+-- The app now normalizes and blocks duplicate phone numbers during registration.
+-- This migration is intentionally documented-only until existing data is audited,
+-- because a hard unique index would fail if historical duplicates already exist.

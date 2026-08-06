@@ -3,6 +3,33 @@ import { taggableCollections, productCollections } from '../lib/collections'
 import { computeDisplayPricing } from '../../functions/_utils/pricing.js'
 import { resolveSaleConfig, saleAmountForDept } from '../../functions/_utils/sale.js'
 
+const ADMIN_PERMISSION_LABELS = {
+  orders: 'Orders',
+  willcall: 'Will Call',
+  inventory: 'Products / Inventory',
+  subscribers: 'Subscribers',
+  analytics: 'Analytics',
+  promos: 'Promos',
+  reviews: 'Reviews',
+  coa: 'Certificates / COAs',
+  settings: 'Settings',
+  storefront: 'Storefront Links',
+  tax: 'Tax Records',
+  announce: 'Announcements',
+  suggestions: 'Suggestions',
+  trash: 'Trash',
+  admin_users: 'Admin Users & Permissions',
+}
+
+const ADMIN_PERMISSION_ORDER = Object.keys(ADMIN_PERMISSION_LABELS)
+
+function adminCan(admin, permission) {
+  if (!permission) return true
+  if (!admin) return false
+  if (admin.owner || admin.role === 'owner') return true
+  return Array.isArray(admin.permissions) && admin.permissions.includes(permission)
+}
+
 // ─── Toast System ─────────────────────────────────────────────────────────────
 
 const ToastCtx = createContext(null)
@@ -5960,6 +5987,298 @@ function WillCallTab({ onOrderCreated }) {
   )
 }
 
+function AdminUsersTab() {
+  const showToast = useToast()
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const blank = { id: null, name: '', username: '', email: '', password: '', permissions: [], is_active: true }
+  const [users, setUsers] = useState([])
+  const [form, setForm] = useState(blank)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/users', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not load admin users'); return }
+      setUsers(d.users || [])
+    } catch { setErr('Network error loading admin users') }
+    finally { setLoading(false) }
+  }, [adminToken])
+
+  useEffect(() => { loadUsers() }, [loadUsers])
+
+  const togglePerm = (perm) => {
+    setForm(prev => {
+      const has = prev.permissions.includes(perm)
+      return { ...prev, permissions: has ? prev.permissions.filter(p => p !== perm) : [...prev.permissions, perm] }
+    })
+  }
+
+  const editUser = (u) => {
+    setErr('')
+    setForm({ ...u, password: '', permissions: Array.isArray(u.permissions) ? u.permissions : [] })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const resetForm = () => {
+    setErr('')
+    setForm(blank)
+  }
+
+  const save = async (e) => {
+    e.preventDefault()
+    setSaving(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: form.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify(form),
+      })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not save user'); return }
+      showToast(form.id ? 'Admin user updated' : 'Admin user created')
+      resetForm()
+      loadUsers()
+    } catch { setErr('Network error saving user') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (u) => {
+    if (!confirm(`Delete admin user ${u.username}?`)) return
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ id: u.id }),
+      })
+      if (!res.ok) { showToast('Could not delete admin user', 'error'); return }
+      showToast('Admin user deleted')
+      if (form.id === u.id) resetForm()
+      loadUsers()
+    } catch { showToast('Network error deleting user', 'error') }
+  }
+
+  return (
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6">
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-white font-bold text-lg">Admin Users</h2>
+          <p className="text-zinc-500 text-sm">Create separate admin logins and check off exactly which areas each person can access.</p>
+        </div>
+        {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
+        {loading ? (
+          <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+        ) : users.length === 0 ? (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-zinc-500 text-sm">No extra admin users yet. Your owner login still has full access.</div>
+        ) : (
+          <div className="space-y-3">
+            {users.map(u => (
+              <div key={u.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="text-white font-bold truncate">{u.name}</div>
+                    {!u.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 font-bold">Disabled</span>}
+                  </div>
+                  <div className="text-zinc-500 text-xs">@{u.username}{u.email ? ` · ${u.email}` : ''}</div>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(u.permissions || []).length === 0 ? (
+                      <span className="text-zinc-600 text-xs">No permissions</span>
+                    ) : u.permissions.map(p => (
+                      <span key={p} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 font-semibold">
+                        {ADMIN_PERMISSION_LABELS[p] || p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => editUser(u)} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Edit</button>
+                  <button onClick={() => remove(u)} className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold">Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={save} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-fit sticky top-24 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-bold">{form.id ? 'Edit Admin User' : 'Add Admin User'}</h3>
+          {form.id && <button type="button" onClick={resetForm} className="text-zinc-500 hover:text-white text-xs font-bold">New</button>}
+        </div>
+        <div className="space-y-3">
+          <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Full name"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+          <input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value.toLowerCase() }))} placeholder="Username"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+          <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="Email optional"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+          <input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder={form.id ? 'New password optional' : 'Password'}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+          <label className="flex items-center gap-2 text-zinc-300 text-sm">
+            <input type="checkbox" checked={form.is_active !== false} onChange={e => setForm(p => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 accent-blue-600" />
+            Active user
+          </label>
+        </div>
+
+        <div>
+          <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-2">Access Rights</div>
+          <div className="grid grid-cols-1 gap-2">
+            {ADMIN_PERMISSION_ORDER.map(perm => (
+              <label key={perm} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${form.permissions.includes(perm) ? 'bg-blue-500/10 border-blue-500/40 text-white' : 'bg-zinc-950/40 border-zinc-800 text-zinc-400 hover:text-white'}`}>
+                <input type="checkbox" checked={form.permissions.includes(perm)} onChange={() => togglePerm(perm)} className="w-4 h-4 accent-blue-600" />
+                <span className="text-sm font-semibold">{ADMIN_PERMISSION_LABELS[perm]}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-amber-400/80 text-xs mt-3">Only check “Admin Users & Permissions” if you want this person to manage other admin users too.</p>
+        </div>
+
+        <button disabled={saving} className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold">
+          {saving ? 'Saving…' : form.id ? 'Save Changes' : 'Create Admin User'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function AdminAccountTab({ adminMe, onProfileUpdated }) {
+  const showToast = useToast()
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const [form, setForm] = useState({ username: adminMe?.username || 'owner', email: adminMe?.email || '', current_password: '', new_password: '' })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const [totp, setTotp] = useState({ enabled: !!adminMe?.totp_enabled, secret: '', otpauthUrl: '', code: '', password: '' })
+
+  useEffect(() => {
+    setForm({ username: adminMe?.username || 'owner', email: adminMe?.email || '', current_password: '', new_password: '' })
+    setTotp(p => ({ ...p, enabled: !!adminMe?.totp_enabled }))
+  }, [adminMe])
+
+  const saveProfile = async (e) => {
+    e.preventDefault()
+    setSaving(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify(form),
+      })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not update profile'); return }
+      showToast('Admin account updated')
+      setForm(p => ({ ...p, current_password: '', new_password: '' }))
+      onProfileUpdated?.(d.admin)
+    } catch { setErr('Network error updating profile') }
+    finally { setSaving(false) }
+  }
+
+  const start2FA = async () => {
+    setErr('')
+    try {
+      const res = await fetch('/api/admin/totp', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not start 2FA setup'); return }
+      setTotp(p => ({ ...p, secret: d.secret, otpauthUrl: d.otpauthUrl, code: '' }))
+    } catch { setErr('Network error starting 2FA setup') }
+  }
+
+  const enable2FA = async () => {
+    setErr('')
+    try {
+      const res = await fetch('/api/admin/totp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ secret: totp.secret, code: totp.code }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not enable 2FA'); return }
+      showToast('2FA enabled')
+      setTotp(p => ({ ...p, enabled: true, secret: '', otpauthUrl: '', code: '' }))
+      onProfileUpdated?.({ ...adminMe, totp_enabled: true })
+    } catch { setErr('Network error enabling 2FA') }
+  }
+
+  const disable2FA = async () => {
+    setErr('')
+    try {
+      const res = await fetch('/api/admin/totp-disable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ password: totp.password }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not disable 2FA'); return }
+      showToast('2FA disabled')
+      setTotp(p => ({ ...p, enabled: false, password: '' }))
+      onProfileUpdated?.({ ...adminMe, totp_enabled: false })
+    } catch { setErr('Network error disabling 2FA') }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h2 className="text-white font-bold text-lg">My Admin Account</h2>
+        <p className="text-zinc-500 text-sm">Change your admin username/password and manage your own 2FA.</p>
+      </div>
+      {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
+
+      <form onSubmit={saveProfile} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4">
+        <h3 className="text-white font-bold">Login Details</h3>
+        <input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value.toLowerCase() }))} placeholder="Username"
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+        {!adminMe?.owner && (
+          <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="Email"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+        )}
+        <input type="password" value={form.current_password} onChange={e => setForm(p => ({ ...p, current_password: e.target.value }))} placeholder="Current password required"
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+        <input type="password" value={form.new_password} onChange={e => setForm(p => ({ ...p, new_password: e.target.value }))} placeholder="New password optional"
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+        <button disabled={saving} className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold">
+          {saving ? 'Saving…' : 'Save Login Details'}
+        </button>
+      </form>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-bold">Two-Factor Authentication</h3>
+            <p className="text-zinc-500 text-sm">{totp.enabled ? 'Enabled for this admin account.' : 'Add an authenticator app code at login.'}</p>
+          </div>
+          <span className={`text-xs font-bold px-2 py-1 rounded-full ${totp.enabled ? 'bg-green-500/15 text-green-400 border border-green-500/30' : 'bg-zinc-800 text-zinc-500 border border-zinc-700'}`}>
+            {totp.enabled ? 'Enabled' : 'Off'}
+          </span>
+        </div>
+        {!totp.enabled && !totp.secret && (
+          <button onClick={start2FA} className="w-full py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold">Set Up 2FA</button>
+        )}
+        {!totp.enabled && totp.secret && (
+          <div className="space-y-3">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
+              <p className="text-zinc-400 text-sm mb-2">Scan this setup URL in your authenticator app, or copy the secret manually.</p>
+              <div className="text-blue-300 text-xs break-all font-mono">{totp.otpauthUrl}</div>
+              <div className="text-zinc-500 text-xs mt-2">Secret: <span className="font-mono text-zinc-300">{totp.secret}</span></div>
+            </div>
+            <input value={totp.code} onChange={e => setTotp(p => ({ ...p, code: e.target.value.replace(/\D/g, '').slice(0, 6) }))} placeholder="6-digit code"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 text-center tracking-[0.3em] font-mono" />
+            <button onClick={enable2FA} disabled={totp.code.length !== 6} className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold">Verify & Enable</button>
+          </div>
+        )}
+        {totp.enabled && (
+          <div className="space-y-3">
+            <input type="password" value={totp.password} onChange={e => setTotp(p => ({ ...p, password: e.target.value }))} placeholder="Current password to disable"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
+            <button onClick={disable2FA} className="w-full py-3 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold">Disable 2FA</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Converts base64url VAPID public key to Uint8Array for PushManager.subscribe()
 function urlB64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -5970,8 +6289,13 @@ function urlB64ToUint8Array(base64String) {
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(() => !!sessionStorage.getItem('pl_admin_token'))
+  const [adminMe, setAdminMe] = useState(null)
+  const [loginUser, setLoginUser] = useState('')
   const [pw, setPw] = useState('')
   const [loginErr, setLoginErr] = useState('')
+  const [adminForgot, setAdminForgot] = useState(false)
+  const [adminForgotId, setAdminForgotId] = useState('')
+  const [adminForgotSent, setAdminForgotSent] = useState(false)
   const [pendingToken, setPendingToken] = useState(null) // set when password is correct but a 2FA code is still needed
   const [twoFACode, setTwoFACode] = useState('')
   const [data, setData] = useState(null)
@@ -5992,6 +6316,17 @@ export default function AdminPage() {
       setData(d)
     } catch {}
     finally { setLoading(false) }
+  }, [])
+
+  const loadSession = useCallback(async () => {
+    const jwt = sessionStorage.getItem('pl_admin_token')
+    if (!jwt) return
+    try {
+      const res = await fetch('/api/admin/session', { headers: { Authorization: `Bearer ${jwt}` } })
+      const d = await res.json()
+      if (res.ok) setAdminMe(d.admin || { owner: true, role: 'owner', permissions: ['*'] })
+      else { sessionStorage.removeItem('pl_admin_token'); setAdminMe(null); setAuthed(false) }
+    } catch {}
   }, [])
 
   // Check existing push subscription on mount
@@ -6062,6 +6397,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (authed) {
+      loadSession()
       load()
       checkPushState()
       // Register SW in background even if not subscribing yet
@@ -6069,7 +6405,32 @@ export default function AdminPage() {
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
       }
     }
-  }, [authed, load, checkPushState])
+  }, [authed, load, loadSession, checkPushState])
+
+  useEffect(() => {
+    if (!authed || !adminMe) return
+    const visible = [
+      { id: 'orders', permission: 'orders' },
+      { id: 'willcall', permission: 'willcall' },
+      { id: 'completed', permission: 'orders' },
+      { id: 'cancelled', permission: 'orders' },
+      { id: 'inventory', permission: 'inventory' },
+      { id: 'subscribers', permission: 'subscribers' },
+      { id: 'analytics', permission: 'analytics' },
+      { id: 'promos', permission: 'promos' },
+      { id: 'reviews', permission: 'reviews' },
+      { id: 'coa', permission: 'coa' },
+      { id: 'settings', permission: 'settings' },
+      { id: 'storefront', permission: 'storefront' },
+      { id: 'tax', permission: 'tax' },
+      { id: 'announce', permission: 'announce' },
+      { id: 'suggestions', permission: 'suggestions' },
+      { id: 'trash', permission: 'trash' },
+      { id: 'admin-users', permission: 'admin_users' },
+      { id: 'account', permission: null },
+    ].filter(t => adminCan(adminMe, t.permission))
+    if (!visible.some(t => t.id === tab)) setTab(visible[0]?.id || 'storefront')
+  }, [authed, adminMe, tab])
 
   const tryLogin = async (e) => {
     e.preventDefault()
@@ -6078,14 +6439,14 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw })
+        body: JSON.stringify({ username: loginUser, password: pw })
       })
       const data = await res.json()
       if (res.ok && data.requires2fa) {
         setPendingToken(data.pendingToken)
       } else if (res.ok && data.token) {
         sessionStorage.setItem('pl_admin_token', data.token)
-        setPw('')
+        setPw(''); setLoginUser(''); setAdminMe(data.admin || null)
         setAuthed(true)
       } else if (res.status === 429) {
         setLoginErr(data.error || 'Too many attempts. Try again later.')
@@ -6107,13 +6468,26 @@ export default function AdminPage() {
       const data = await res.json()
       if (res.ok && data.token) {
         sessionStorage.setItem('pl_admin_token', data.token)
-        setPw(''); setPendingToken(null); setTwoFACode('')
+        setPw(''); setLoginUser(''); setPendingToken(null); setTwoFACode(''); setAdminMe(data.admin || null)
         setAuthed(true)
       } else if (res.status === 429) {
         setLoginErr(data.error || 'Too many attempts. Try again later.')
       } else {
         setLoginErr(data.error || 'Invalid code')
       }
+    } catch { setLoginErr('Network error. Please try again.') }
+  }
+
+  const sendAdminReset = async (e) => {
+    e.preventDefault()
+    setLoginErr('')
+    try {
+      await fetch('/api/admin/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: adminForgotId }),
+      })
+      setAdminForgotSent(true)
     } catch { setLoginErr('Network error. Please try again.') }
   }
 
@@ -6127,7 +6501,25 @@ export default function AdminPage() {
             <p className="text-zinc-500 text-sm mb-6">
               {pendingToken ? 'Enter the 6-digit code from your authenticator app' : 'Pryme Labs Order Dashboard'}
             </p>
-            {pendingToken ? (
+            {adminForgot ? (
+              <div className="space-y-4">
+                <form onSubmit={sendAdminReset} className="space-y-4">
+                  <input type="text" placeholder="Admin username or email" value={adminForgotId} onChange={e => setAdminForgotId(e.target.value)} autoFocus
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-base" />
+                  {adminForgotSent && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-green-400 text-sm">
+                      If an admin account with an email exists, a reset link is on the way.
+                    </div>
+                  )}
+                  {loginErr && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">{loginErr}</div>
+                  )}
+                  <button className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-2xl transition-colors">Send Reset Link</button>
+                </form>
+                <button type="button" onClick={() => { setAdminForgot(false); setAdminForgotSent(false); setLoginErr('') }}
+                  className="w-full text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors">← Back to sign in</button>
+              </div>
+            ) : pendingToken ? (
               <form onSubmit={tryVerify2FA} className="space-y-4">
                 <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="123456"
                   value={twoFACode} onChange={e => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus
@@ -6144,7 +6536,9 @@ export default function AdminPage() {
               </form>
             ) : (
               <form onSubmit={tryLogin} className="space-y-4">
-                <input type="password" placeholder="Admin password" value={pw} onChange={e => setPw(e.target.value)} autoFocus
+                <input type="text" placeholder="Username or email (blank for owner)" value={loginUser} onChange={e => setLoginUser(e.target.value)} autoFocus
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-base" />
+                <input type="password" placeholder="Admin password" value={pw} onChange={e => setPw(e.target.value)}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-base" />
                 {loginErr && (
                   <div className={`text-sm px-3 py-2 rounded-lg ${loginErr.includes('many') ? 'bg-orange-500/10 border border-orange-500/30 text-orange-400' : 'text-red-400'}`}>
@@ -6152,9 +6546,21 @@ export default function AdminPage() {
                   </div>
                 )}
                 <button type="submit" className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-2xl transition-colors">Sign In</button>
+                <button type="button" onClick={() => { setAdminForgot(true); setAdminForgotId(loginUser); setAdminForgotSent(false); setLoginErr('') }}
+                  className="w-full text-zinc-500 hover:text-blue-400 text-sm transition-colors">Forgot admin password?</button>
               </form>
             )}
           </div>
+        </div>
+      </ToastProvider>
+    )
+  }
+
+  if (!adminMe) {
+    return (
+      <ToastProvider>
+        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+          <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
       </ToastProvider>
     )
@@ -6208,23 +6614,25 @@ export default function AdminPage() {
   }
 
   const TABS = [
-    { id: 'orders',      label: 'Orders',         short: '📦' },
-    { id: 'willcall',    label: 'Will Call',       short: '🏷️' },
-    { id: 'completed',   label: 'Completed',      short: '✅' },
-    { id: 'cancelled',   label: 'Cancelled',      short: '❌' },
-    { id: 'inventory',   label: 'Products',        short: '🏬' },
-    { id: 'subscribers', label: totalSubCount > 0 ? `👥 Subs · ${totalSubCount}` : '👥 Subs', short: '👥', badge: newSubCount },
-    { id: 'analytics',   label: 'Analytics',       short: '📈' },
-    { id: 'promos',      label: 'Promos',          short: '🏷️' },
-    { id: 'reviews',     label: 'Reviews',         short: '⭐' },
-    { id: 'coa',         label: 'Certificates',    short: '📄' },
-    { id: 'settings',    label: 'Settings',        short: '⚙️' },
-    { id: 'storefront',  label: 'Storefront',      short: '🛍️' },
-    { id: 'tax',         label: 'Tax',             short: '🧾' },
-    { id: 'announce',    label: 'Announce',        short: '📣' },
-    { id: 'suggestions', label: '💡 Suggestions',  short: '💡' },
-    { id: 'trash',       label: 'Trash',           short: '🗑️' },
-  ]
+    { id: 'orders',      label: 'Orders',         short: '📦', permission: 'orders' },
+    { id: 'willcall',    label: 'Will Call',       short: '🏷️', permission: 'willcall' },
+    { id: 'completed',   label: 'Completed',      short: '✅', permission: 'orders' },
+    { id: 'cancelled',   label: 'Cancelled',      short: '❌', permission: 'orders' },
+    { id: 'inventory',   label: 'Products',        short: '🏬', permission: 'inventory' },
+    { id: 'subscribers', label: totalSubCount > 0 ? `👥 Subs · ${totalSubCount}` : '👥 Subs', short: '👥', badge: newSubCount, permission: 'subscribers' },
+    { id: 'analytics',   label: 'Analytics',       short: '📈', permission: 'analytics' },
+    { id: 'promos',      label: 'Promos',          short: '🏷️', permission: 'promos' },
+    { id: 'reviews',     label: 'Reviews',         short: '⭐', permission: 'reviews' },
+    { id: 'coa',         label: 'Certificates',    short: '📄', permission: 'coa' },
+    { id: 'settings',    label: 'Settings',        short: '⚙️', permission: 'settings' },
+    { id: 'storefront',  label: 'Storefront',      short: '🛍️', permission: 'storefront' },
+    { id: 'tax',         label: 'Tax',             short: '🧾', permission: 'tax' },
+    { id: 'announce',    label: 'Announce',        short: '📣', permission: 'announce' },
+    { id: 'suggestions', label: '💡 Suggestions',  short: '💡', permission: 'suggestions' },
+    { id: 'trash',       label: 'Trash',           short: '🗑️', permission: 'trash' },
+    { id: 'admin-users', label: 'Admin Users',     short: '👮', permission: 'admin_users' },
+    { id: 'account',     label: 'My Account',      short: '🔐' },
+  ].filter(t => adminCan(adminMe, t.permission))
 
   return (
     <ToastProvider>
@@ -6270,7 +6678,13 @@ export default function AdminPage() {
                 )}
               </button>
             )}
-            <button onClick={() => { sessionStorage.removeItem('pl_admin_token'); sessionStorage.removeItem('pl_admin'); localStorage.removeItem('pl_admin_pw'); localStorage.removeItem('pl_admin_bypass'); setAuthed(false) }}
+            {adminMe && (
+              <div className="hidden sm:block text-right mr-1">
+                <div className="text-white text-xs font-bold leading-tight">{adminMe.owner ? 'Owner' : adminMe.name}</div>
+                <div className="text-zinc-600 text-[10px] leading-tight">{adminMe.owner ? 'Full access' : 'Limited admin'}</div>
+              </div>
+            )}
+            <button onClick={() => { sessionStorage.removeItem('pl_admin_token'); sessionStorage.removeItem('pl_admin'); localStorage.removeItem('pl_admin_pw'); localStorage.removeItem('pl_admin_bypass'); setAdminMe(null); setAuthed(false) }}
               className="text-xs text-zinc-500 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg hover:bg-zinc-800">
               Sign Out
             </button>
@@ -6294,22 +6708,24 @@ export default function AdminPage() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {tab === 'orders' && <OrdersTab data={data} loading={loading} onRefresh={load} onSwitchTab={setTab} />}
-        {tab === 'willcall' && <WillCallTab onOrderCreated={load} />}
-        {tab === 'completed' && <CompletedOrdersTab data={data} loading={loading} onRefresh={load} />}
-        {tab === 'cancelled' && <CancelledOrdersTab data={data} loading={loading} onRefresh={load} />}
-        {tab === 'inventory' && <InventoryTab />}
-        {tab === 'subscribers' && <SubscribersTab onNewCount={setNewSubCount} onTotalCount={setTotalSubCount} />}
-        {tab === 'analytics' && <AnalyticsTab />}
-        {tab === 'promos' && <PromosTab />}
-        {tab === 'reviews' && <ReviewsTab />}
-        {tab === 'coa' && <CoaTab />}
-        {tab === 'settings' && <SettingsTab />}
-        {tab === 'storefront' && <StorefrontTab />}
-        {tab === 'tax' && <TaxRecordsTab data={data} loading={loading} />}
-        {tab === 'announce' && <AnnouncementsTab />}
-        {tab === 'suggestions' && <SuggestionsTab />}
-        {tab === 'trash' && <TrashTab />}
+        {tab === 'orders' && adminCan(adminMe, 'orders') && <OrdersTab data={data} loading={loading} onRefresh={load} onSwitchTab={setTab} />}
+        {tab === 'willcall' && adminCan(adminMe, 'willcall') && <WillCallTab onOrderCreated={load} />}
+        {tab === 'completed' && adminCan(adminMe, 'orders') && <CompletedOrdersTab data={data} loading={loading} onRefresh={load} />}
+        {tab === 'cancelled' && adminCan(adminMe, 'orders') && <CancelledOrdersTab data={data} loading={loading} onRefresh={load} />}
+        {tab === 'inventory' && adminCan(adminMe, 'inventory') && <InventoryTab />}
+        {tab === 'subscribers' && adminCan(adminMe, 'subscribers') && <SubscribersTab onNewCount={setNewSubCount} onTotalCount={setTotalSubCount} />}
+        {tab === 'analytics' && adminCan(adminMe, 'analytics') && <AnalyticsTab />}
+        {tab === 'promos' && adminCan(adminMe, 'promos') && <PromosTab />}
+        {tab === 'reviews' && adminCan(adminMe, 'reviews') && <ReviewsTab />}
+        {tab === 'coa' && adminCan(adminMe, 'coa') && <CoaTab />}
+        {tab === 'settings' && adminCan(adminMe, 'settings') && <SettingsTab />}
+        {tab === 'storefront' && adminCan(adminMe, 'storefront') && <StorefrontTab />}
+        {tab === 'tax' && adminCan(adminMe, 'tax') && <TaxRecordsTab data={data} loading={loading} />}
+        {tab === 'announce' && adminCan(adminMe, 'announce') && <AnnouncementsTab />}
+        {tab === 'suggestions' && adminCan(adminMe, 'suggestions') && <SuggestionsTab />}
+        {tab === 'trash' && adminCan(adminMe, 'trash') && <TrashTab />}
+        {tab === 'admin-users' && adminCan(adminMe, 'admin_users') && <AdminUsersTab />}
+        {tab === 'account' && <AdminAccountTab adminMe={adminMe} onProfileUpdated={(next) => setAdminMe(p => ({ ...p, ...next }))} />}
       </main>
     </div>
     </ToastProvider>

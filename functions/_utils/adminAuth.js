@@ -1,5 +1,6 @@
 // Admin authentication helper - validates JWT tokens
 import { constantTimeCompare } from './constantTime.js';
+import { hasAdminPermission, inferAdminPermission } from './adminPermissions.js';
 
 // Cloudflare Pages Functions run on the Workers runtime, which has no
 // Node.js Buffer global (no nodejs_compat flag set) — must use Web Crypto
@@ -54,6 +55,10 @@ export async function verifyAdminToken(request, env) {
     // (i.e. a fully completed admin login, past 2FA if enabled) is accepted.
     if (payload.admin !== true) {
       return { valid: false, error: 'Invalid token' };
+    }
+    const required = inferAdminPermission(request);
+    if (required && !hasAdminPermission(payload, required)) {
+      return { valid: false, error: 'Forbidden', status: 403 };
     }
     return { valid: true, payload };
   } catch (e) {

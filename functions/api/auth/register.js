@@ -11,6 +11,12 @@ function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
 
+function normalizePhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '')
+  if (!digits) return null
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
+}
+
 export async function onRequestPost({ request, env, waitUntil }) {
   // Rate-limit account creation — 5 registrations per 15 minutes per IP
   const rlKey = rateLimitKey(request, 'register')
@@ -51,8 +57,17 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const emailTaken = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email.trim().toLowerCase()).first()
   if (emailTaken) return json({ error: 'An account with that email already exists' }, 409)
 
+  const cleanPhone = normalizePhone(phone)
+  if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 15) return json({ error: 'Valid phone number required' }, 400)
+  const phoneTaken = await env.DB.prepare(
+    `SELECT id FROM users
+      WHERE phone = ?
+         OR replace(replace(replace(replace(replace(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+1', '') = ?
+         OR replace(replace(replace(replace(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?`
+  ).bind(cleanPhone, cleanPhone, `1${cleanPhone}`).first()
+  if (phoneTaken) return json({ error: 'An account with that phone number already exists' }, 409)
+
   const { hash, salt } = await hashPassword(password)
-  const cleanPhone = phone?.trim() || null
   const cleanLang = ['en', 'es'].includes(lang) ? lang : 'en'
   const result = await env.DB.prepare(
     'INSERT INTO users (name, username, email, password_hash, salt, phone, lang) VALUES (?, ?, ?, ?, ?, ?, ?)'

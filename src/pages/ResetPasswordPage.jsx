@@ -11,6 +11,7 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const [isAdminReset, setIsAdminReset] = useState(false)
   const navigate = useNavigate()
   const t = useT()
   const { lang, setLanguage } = useLanguage()
@@ -18,6 +19,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const tok = params.get('token') || ''
+    setIsAdminReset(params.get('admin') === '1')
     setToken(tok)
     if (!tok) setError(t.auth.missingToken)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -27,11 +29,11 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setError('')
     if (!token) { setError(t.auth.missingToken); return }
-    if (password.length < 8) { setError(t.auth.passwordLength); return }
+    if (password.length < (isAdminReset ? 10 : 8)) { setError(isAdminReset ? 'Admin password must be at least 10 characters' : t.auth.passwordLength); return }
     if (password !== confirm) { setError(t.auth.passwordMatch); return }
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await fetch(isAdminReset ? '/api/admin/reset-password' : '/api/auth/reset-password', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),
       })
@@ -73,7 +75,7 @@ export default function ResetPasswordPage() {
                   </svg>
                 </div>
                 <p className="text-zinc-300 text-sm">{t.auth.resetSuccess}</p>
-                <button onClick={() => navigate('/auth')}
+                <button onClick={() => navigate(isAdminReset ? '/admin' : '/auth')}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-colors">
                   {t.auth.goToSignIn}
                 </button>
@@ -111,7 +113,7 @@ export default function ResetPasswordPage() {
                     className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-colors shadow-lg shadow-blue-900/30">
                     {loading ? t.auth.updatingPassword : t.auth.updatePassword}
                   </button>
-                  <button type="button" onClick={() => navigate('/auth')}
+                  <button type="button" onClick={() => navigate(isAdminReset ? '/admin' : '/auth')}
                     className="w-full text-center text-zinc-500 hover:text-white text-sm transition-colors">
                     {t.auth.backToSignIn}
                   </button>

@@ -5,6 +5,12 @@ import { sendEmail, passwordResetHtml, passwordResetHtmlEs } from '../../_utils/
 
 const RESET_TTL_MINUTES = 30
 
+function normalizePhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '')
+  if (!digits) return null
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
+}
+
 export async function onRequestPost({ request, env, waitUntil }) {
   // Rate-limit by IP so this can't be used to spam inboxes or probe accounts
   const rl = await checkRateLimit(env, rateLimitKey(request, 'forgot'))
@@ -15,20 +21,28 @@ export async function onRequestPost({ request, env, waitUntil }) {
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
 
-  const email = String(body.email || '').trim().toLowerCase()
+  const email = String(body.email || body.identifier || '').trim().toLowerCase()
+  const phone = normalizePhone(email)
   // Always respond the same way whether or not the account exists — this
   // prevents using the endpoint to discover which emails have accounts.
   const genericOk = json({ ok: true })
 
-  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || email.length > 254 || (!phone && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
     return genericOk
   }
 
-  const user = await env.DB.prepare(
-    'SELECT id, name, username, email, lang FROM users WHERE email = ?'
-  ).bind(email).first()
+  const user = phone
+    ? await env.DB.prepare(
+        `SELECT id, name, username, email, lang FROM users
+          WHERE phone = ?
+             OR replace(replace(replace(replace(replace(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+1', '') = ?
+             OR replace(replace(replace(replace(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?`
+      ).bind(phone, phone, `1${phone}`).first()
+    : await env.DB.prepare(
+        'SELECT id, name, username, email, lang FROM users WHERE email = ?'
+      ).bind(email).first()
 
-  if (!user) return genericOk
+  if (!user?.email) return genericOk
 
   // Issue a single-use, time-limited token. Store only its hash.
   const token = generateToken()
