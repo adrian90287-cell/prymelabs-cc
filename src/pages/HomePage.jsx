@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import CartSidebar from '../components/CartSidebar'
 import Footer from '../components/Footer'
-import { useCart } from '../context/CartContext'
 import { useT } from '../context/LanguageContext'
 import { authHeaders } from '../lib/authHeaders'
+import { useProductCatalog } from '../hooks/useProductCatalog'
 import { DEPARTMENTS, DEPARTMENT_META } from '../components/ProductGrid'
 import { departmentSlug, departmentOf } from '../lib/collections'
 
@@ -60,18 +60,13 @@ function DepartmentCard({ dep, name, blurb, count, image, onOpen, productsLabel 
 }
 
 export default function HomePage() {
-  const [products, setProducts] = useState([])
+  const { products } = useProductCatalog()
   const [heroes, setHeroes] = useState({})
-  const { reconcilePrices } = useCart()
   const navigate = useNavigate()
   const t = useT()
   const departmentsRef = useRef(null)
 
   useEffect(() => {
-    fetch('/api/products', { headers: authHeaders() })
-      .then(r => r.json())
-      .then(data => { const list = data.products || []; setProducts(list); reconcilePrices(list) })
-      .catch(() => {})
     fetch('/api/storefront/home-media', { headers: authHeaders() })
       .then(r => r.json())
       .then(data => setHeroes(data.heroes || {}))

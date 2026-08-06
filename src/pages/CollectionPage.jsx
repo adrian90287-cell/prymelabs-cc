@@ -5,9 +5,9 @@ import CartSidebar from '../components/CartSidebar'
 import Footer from '../components/Footer'
 import { ProductGrid } from '../components/ProductGrid'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
-import { useCart } from '../context/CartContext'
 import { useT } from '../context/LanguageContext'
 import { authHeaders } from '../lib/authHeaders'
+import { useProductCatalog } from '../hooks/useProductCatalog'
 import {
   DEPARTMENT_COLLECTIONS,
   departmentFromSlug, collectionFromSlug, slugify,
@@ -37,11 +37,8 @@ export default function CollectionPage() {
   const { deptSlug, colSlug } = useParams()
   const navigate = useNavigate()
   const t = useT()
-  const { reconcilePrices } = useCart()
-  const [products, setProducts] = useState([])
+  const { products, showWasPrice, loading } = useProductCatalog()
   const [coaDocs, setCoaDocs] = useState([])
-  const [showWasPrice, setShowWasPrice] = useState(true)
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [peptideAcked, setPeptideAcked] = useState(hasAckedPeptideGate())
 
@@ -55,14 +52,6 @@ export default function CollectionPage() {
   }, [department])
 
   useEffect(() => {
-    fetch('/api/products', { headers: authHeaders() })
-      .then(r => r.json())
-      .then(data => {
-        const list = data.products || []
-        setProducts(list); setShowWasPrice(data.show_was_price !== false); setLoading(false)
-        reconcilePrices(list)
-      })
-      .catch(() => setLoading(false))
     fetch('/api/coa', { headers: authHeaders() })
       .then(r => r.json())
       .then(data => setCoaDocs(data.documents || []))

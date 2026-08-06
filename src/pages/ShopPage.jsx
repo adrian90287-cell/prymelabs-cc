@@ -3,10 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import CartSidebar from '../components/CartSidebar'
 import Footer from '../components/Footer'
-import { useCart } from '../context/CartContext'
 import { useT } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { authHeaders } from '../lib/authHeaders'
+import { useProductCatalog } from '../hooks/useProductCatalog'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import {
   ProductModal, ProductGroupCard, groupByName,
@@ -109,9 +109,7 @@ function SuggestionBox() {
 }
 
 export default function ShopPage() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { products, showWasPrice, loading, error: catalogError } = useProductCatalog()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialDept = DEPARTMENTS.includes(searchParams.get('dept')) ? searchParams.get('dept') : 'All'
   const [department, setDepartment] = useState(initialDept)
@@ -120,10 +118,9 @@ export default function ShopPage() {
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState(null) // { group, variant }
   const [coaDocs, setCoaDocs] = useState([])
-  const [showWasPrice, setShowWasPrice] = useState(true)
   const [peptideAcked, setPeptideAcked] = useState(hasAckedPeptideGate())
-  const { reconcilePrices } = useCart()
   const t = useT()
+  const error = catalogError ? t.shop.loadError : ''
 
   // Re-check whenever the department filter lands on Peptides — a login/logout
   // since this page last mounted can have cleared the sessionStorage ack.
@@ -132,15 +129,6 @@ export default function ShopPage() {
   }, [department])
 
   useEffect(() => {
-    fetch('/api/products', { headers: authHeaders() })
-      .then(r => r.json())
-      .then(data => {
-        const list = data.products || []
-        setProducts(list); setShowWasPrice(data.show_was_price !== false); setLoading(false)
-        reconcilePrices(list) // keep any persisted cart items priced at the current storefront price
-      })
-      .catch(() => { setError(t.shop.loadError); setLoading(false) })
-
     fetch('/api/coa', { headers: authHeaders() })
       .then(r => r.json())
       .then(data => setCoaDocs(data.documents || []))
