@@ -28,6 +28,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(order_id).first()
   if (!order) return json({ error: 'Order not found' }, 404)
 
+  // Re-applying the same status (accidental double-click, retried request)
+  // shouldn't re-fire customer notifications. The reship flow is unaffected —
+  // it always drops back to 'fulfilled' before re-transitioning to 'shipped'
+  // with the new tracking number, so that's still a genuine status change.
+  const statusChanging = order.status !== status
+
   const now = Math.floor(Date.now() / 1000)
 
   // ── Reship: archive the current label + reset live tracking ────────────────
@@ -132,7 +138,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const isEs = userLang === 'es'
 
   // ── Paid: payment verified ─────────────────────────────────────────────────
-  if (status === 'paid' && order.customer_email) {
+  if (status === 'paid' && statusChanging && order.customer_email) {
     waitUntil(sendEmail(env, {
       to: order.customer_email,
       subject: isEs
@@ -153,7 +159,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   // ── Will Call: ready for pickup (fulfilled) ────────────────────────────────
-  if (status === 'fulfilled' && isWillCall(order) && order.customer_email) {
+  if (status === 'fulfilled' && statusChanging && isWillCall(order) && order.customer_email) {
     waitUntil(sendEmail(env, {
       to: order.customer_email,
       subject: isEs ? `🏷️ Listo para recoger — ${order.order_number}` : `🏷️ Ready for Pickup — ${order.order_number}`,
@@ -172,7 +178,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   // ── Will Call: picked up (completed) ───────────────────────────────────────
-  if (status === 'completed' && isWillCall(order) && order.customer_email) {
+  if (status === 'completed' && statusChanging && isWillCall(order) && order.customer_email) {
     waitUntil(sendEmail(env, {
       to: order.customer_email,
       subject: isEs ? `✅ Pedido recogido — ${order.order_number}` : `✅ Order Picked Up — ${order.order_number}`,
@@ -191,7 +197,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   // ── Cancelled ──────────────────────────────────────────────────────────────
-  if (status === 'cancelled' && order.customer_email) {
+  if (status === 'cancelled' && statusChanging && order.customer_email) {
     waitUntil(sendEmail(env, {
       to: order.customer_email,
       subject: isEs
@@ -212,7 +218,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   // ── Refunded ───────────────────────────────────────────────────────────────
-  if (status === 'refunded' && order.customer_email) {
+  if (status === 'refunded' && statusChanging && order.customer_email) {
     waitUntil(sendEmail(env, {
       to: order.customer_email,
       subject: isEs
@@ -233,7 +239,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   // ── Shipped: tracking notification ────────────────────────────────────────
-  if (status === 'shipped' && tracking?.number) {
+  if (status === 'shipped' && statusChanging && tracking?.number) {
     // Email notification — use waitUntil so Cloudflare keeps the Worker alive
     if (order.customer_email) {
       waitUntil(sendEmail(env, {

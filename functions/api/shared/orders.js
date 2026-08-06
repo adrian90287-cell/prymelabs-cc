@@ -40,38 +40,56 @@ async function createOrder(request, env) {
       );
     }
 
+    // Sanity-check the totals arithmetic. This is a sync of an order already
+    // completed on the origin site (payment was verified there), so we can't
+    // re-derive "the" correct price the way a live checkout would — but we
+    // can still reject an order whose own numbers don't add up, which is
+    // cheap insurance against a leaked SYNC_SECRET being used to inject
+    // arbitrary totals into shared reporting/inventory.
+    const expectedTotal = Number(subtotal || 0) - Number(discount_amount || 0)
+      + Number(shipping_cost || 0) + Number(tax_amount || 0)
+    if (Math.abs(expectedTotal - Number(order_total)) > 0.01) {
+      return Response.json(
+        { error: 'order_total does not match subtotal - discount + shipping + tax' },
+        { status: 400 }
+      );
+    }
+
     // Start transaction: validate stock, decrement, insert order
     try {
-      // 1. Validate all products exist and have sufficient stock
+      // 1-2. Atomically reserve stock per item — a conditional decrement
+      // (stock_qty >= qty) only applies when enough stock still exists,
+      // closing the check-then-decrement race that could oversell under
+      // concurrent syncs from both sites. Unlimited products (stock_qty = 0,
+      // in_stock = 1) are untracked and skipped. On a genuine shortfall we
+      // roll back everything reserved so far and abort.
+      const reserved = []
       for (const item of items) {
-        const product = await env.UNIFIED_DB
-          .prepare('SELECT id, stock_qty FROM products WHERE code = ? FOR UPDATE')
-          .bind(item.code)
-          .first();
+        const r = await env.UNIFIED_DB
+          .prepare('UPDATE products SET stock_qty = stock_qty - ?, updated_at = unixepoch() WHERE code = ? AND stock_qty >= ?')
+          .bind(item.quantity, item.code, item.quantity)
+          .run()
 
+        if (r.meta.changes > 0) { reserved.push(item); continue }
+
+        const product = await env.UNIFIED_DB.prepare('SELECT id, stock_qty, in_stock FROM products WHERE code = ?').bind(item.code).first()
         if (!product) {
-          return Response.json(
-            { error: `Product ${item.code} not found` },
-            { status: 400 }
-          );
+          for (const d of reserved) {
+            await env.UNIFIED_DB.prepare('UPDATE products SET stock_qty = stock_qty + ? WHERE code = ?').bind(d.quantity, d.code).run()
+          }
+          return Response.json({ error: `Product ${item.code} not found` }, { status: 400 })
         }
-
-        if (product.stock_qty < item.quantity) {
+        const unlimited = product.stock_qty === 0 && product.in_stock === 1
+        if (!unlimited) {
+          for (const d of reserved) {
+            await env.UNIFIED_DB.prepare('UPDATE products SET stock_qty = stock_qty + ? WHERE code = ?').bind(d.quantity, d.code).run()
+          }
           return Response.json(
             { error: `Insufficient stock for ${item.code}: available ${product.stock_qty}, requested ${item.quantity}` },
             { status: 400 }
           );
         }
       }
-
-      // 2. Decrement stock for all items
-      const decrementPromises = items.map(item =>
-        env.UNIFIED_DB
-          .prepare('UPDATE products SET stock_qty = stock_qty - ?, updated_at = unixepoch() WHERE code = ?')
-          .bind(item.quantity, item.code)
-          .run()
-      );
-      await Promise.all(decrementPromises);
 
       // 3. Insert order
       const orderResult = await env.UNIFIED_DB

@@ -4,7 +4,7 @@ import { corsHeaders, json } from '../../_utils/cors.js'
 export async function onRequestGet({ request, env }) {
   const authHeader = request.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
-  const payload = await verifyJWT(authHeader.slice(7), env.JWT_SECRET)
+  const payload = await verifyJWT(authHeader.slice(7), env)
   if (!payload) return json({ error: 'Invalid token' }, 401)
 
   const user = await env.DB.prepare(
@@ -17,7 +17,7 @@ export async function onRequestGet({ request, env }) {
 export async function onRequestPost({ request, env }) {
   const authHeader = request.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
-  const payload = await verifyJWT(authHeader.slice(7), env.JWT_SECRET)
+  const payload = await verifyJWT(authHeader.slice(7), env)
   if (!payload) return json({ error: 'Invalid token' }, 401)
 
   let body

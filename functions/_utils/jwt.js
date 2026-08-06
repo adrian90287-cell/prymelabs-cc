@@ -14,7 +14,14 @@ export async function signJWT(payload, secret) {
   return `${data}.${rawB64url(sig)}`;
 }
 
-export async function verifyJWT(token, secret) {
+// Takes `env` (not just the secret) so it can also enforce token_version —
+// bumping a user's token_version (done on password reset) instantly
+// invalidates every JWT issued before that point, even though JWTs are
+// otherwise stateless and would keep working until their 30-day expiry.
+// Tokens signed before this check existed carry no `tv` claim; those are
+// treated as version 0, matching the column default, so they keep working
+// until the next password reset for that account.
+export async function verifyJWT(token, env) {
   if (!token) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -23,7 +30,7 @@ export async function verifyJWT(token, secret) {
   const encoder = new TextEncoder();
 
   const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret),
+    'raw', encoder.encode(env.JWT_SECRET),
     { name: 'HMAC', hash: 'SHA-256' },
     false, ['verify']
   );
@@ -41,6 +48,15 @@ export async function verifyJWT(token, secret) {
   try {
     const payload = JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/')));
     if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+
+    if (payload.sub != null) {
+      const row = await env.DB.prepare('SELECT token_version FROM users WHERE id = ?').bind(payload.sub).first();
+      if (!row) return null; // user deleted since token was issued
+      const currentVersion = row.token_version || 0;
+      const tokenVersion = payload.tv || 0;
+      if (tokenVersion !== currentVersion) return null;
+    }
+
     return payload;
   } catch {
     return null;

@@ -60,7 +60,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   const userId = result.meta.last_row_id
   const token = await signJWT(
-    { sub: userId, username: username.trim().toLowerCase(), name: name.trim(), email: email.trim().toLowerCase(), phone: cleanPhone, lang: cleanLang, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
+    { sub: userId, username: username.trim().toLowerCase(), name: name.trim(), email: email.trim().toLowerCase(), phone: cleanPhone, lang: cleanLang, tv: 0, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
     env.JWT_SECRET
   )
 

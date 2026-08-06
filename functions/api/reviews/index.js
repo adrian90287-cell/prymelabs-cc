@@ -23,7 +23,7 @@ export async function onRequestGet({ request, env }) {
 export async function onRequestPost({ request, env }) {
   const auth = request.headers.get('Authorization') || ''
   if (!auth.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
-  const payload = await verifyJWT(auth.slice(7), env.JWT_SECRET)
+  const payload = await verifyJWT(auth.slice(7), env)
   if (!payload) return json({ error: 'Invalid token' }, 401)
 
   let body

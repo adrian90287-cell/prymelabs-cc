@@ -31,7 +31,10 @@ export async function onRequestPost({ request, env }) {
   }
 
   const { hash, salt } = await hashPassword(password)
-  await env.DB.prepare('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?')
+  // Bump token_version so every JWT issued before this reset — e.g. one held
+  // by whoever the reset was protecting against — stops verifying immediately,
+  // rather than staying valid until its natural 30-day expiry.
+  await env.DB.prepare('UPDATE users SET password_hash = ?, salt = ?, token_version = token_version + 1 WHERE id = ?')
     .bind(hash, salt, reset.user_id).run()
 
   // Burn this token and any other outstanding resets for the account

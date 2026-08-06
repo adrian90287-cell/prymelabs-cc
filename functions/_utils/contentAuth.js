@@ -10,6 +10,6 @@ export async function isContentAuthed(request, env) {
   if (!auth.startsWith('Bearer ')) return false
   const token = auth.slice(7)
   if (env.ADMIN_PASSWORD && token === `admin:${env.ADMIN_PASSWORD}`) return true
-  const payload = await verifyJWT(token, env.JWT_SECRET)
+  const payload = await verifyJWT(token, env)
   return !!payload
 }
