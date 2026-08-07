@@ -2,7 +2,7 @@ import { corsHeaders, json } from '../../_utils/cors.js'
 import { verifyJWT, signJWT } from '../../_utils/jwt.js'
 import { checkRateLimit, rateLimitKey } from '../../_utils/rateLimit.js'
 import { sha256Hex } from '../../_utils/crypto.js'
-import { sendSMS } from '../../_utils/email.js'
+import { phoneVerificationHtml, sendEmail, sendSMS } from '../../_utils/email.js'
 import { ensurePhoneVerificationTable, normalizePhone, randomPhoneCode, smsPhone } from '../../_utils/phoneVerification.js'
 
 function publicUser(row) {
@@ -31,6 +31,13 @@ async function tokenFor(row, env) {
   }, env.JWT_SECRET)
 }
 
+function emailHint(email) {
+  const [name, domain] = String(email || '').split('@')
+  if (!name || !domain) return ''
+  const visible = name.length <= 2 ? `${name[0] || ''}*` : `${name[0]}***${name[name.length - 1]}`
+  return `${visible}@${domain}`
+}
+
 export async function onRequestPost({ request, env }) {
   const auth = request.headers.get('Authorization') || ''
   const payload = auth.startsWith('Bearer ') ? await verifyJWT(auth.slice(7), env) : null
@@ -51,7 +58,6 @@ export async function onRequestPost({ request, env }) {
   const phoneNorm = user.phone_norm || normalizePhone(user.phone)
   const to = smsPhone(phoneNorm)
   if (!phoneNorm || !to) return json({ error: 'No valid phone number on this account' }, 400)
-  if (!env.QUO_API_KEY || !env.QUO_PHONE_NUMBER) return json({ error: 'SMS verification is not configured yet' }, 503)
 
   const now = Math.floor(Date.now() / 1000)
   const recent = await env.DB.prepare(
@@ -73,15 +79,37 @@ export async function onRequestPost({ request, env }) {
     message: `Pryme Labs verification code: ${code}. It expires in 10 minutes.`,
   })
   if (!smsResult?.ok) {
+    let emailResult = null
+    if (user.email) {
+      emailResult = await sendEmail(env, {
+        to: user.email,
+        subject: 'Pryme Labs verification code',
+        html: phoneVerificationHtml({
+          customer_name: user.name,
+          code,
+          phone_hint: phoneNorm.slice(-4),
+        }),
+      }).catch(err => ({ error: err?.message || String(err || 'Email verification fallback failed') }))
+    }
+    if (emailResult?.ok) {
+      return json({
+        ok: true,
+        expires_minutes: 10,
+        phone_hint: phoneNorm.slice(-4),
+        delivery: 'email',
+        email_hint: emailHint(user.email),
+        sms_error: smsResult?.error || null,
+      })
+    }
     await env.DB.prepare('UPDATE phone_verifications SET used = 1 WHERE user_id = ? AND sent_at = ? AND used = 0')
       .bind(user.id, now).run().catch(() => {})
     const status = smsResult?.status || (smsResult?.skipped ? 503 : 502)
     return json({
-      error: smsResult?.error || 'SMS failed to send. Please check SMS provider settings.',
+      error: smsResult?.error || emailResult?.error || 'SMS failed to send. Please check SMS provider settings.',
     }, status)
   }
 
-  return json({ ok: true, expires_minutes: 10, phone_hint: phoneNorm.slice(-4) })
+  return json({ ok: true, expires_minutes: 10, phone_hint: phoneNorm.slice(-4), delivery: 'sms' })
 }
 
 export async function onRequestOptions() {

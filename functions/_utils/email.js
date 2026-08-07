@@ -843,20 +843,78 @@ export function passwordResetHtmlEs({ customer_name, username, reset_url, expire
   return prymeEmailShell({ lang: 'es', rightLabel: 'RESTABLECER', preheader: `Restablece tu contraseña de Pryme Labs — el enlace caduca en ${expires_minutes} minutos.`, body })
 }
 
+export function phoneVerificationHtml({ customer_name, code, phone_hint }) {
+  const first = String(customer_name || '').trim().split(/\s+/)[0]
+  const greeting = first ? `Hi ${escHtml(first)},` : 'Hi,'
+  const body = `
+    ${slipEyebrow('VERIFICATION CODE')}
+    ${slipH1('Verify your phone')}
+    <p style="margin:0 0 24px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">${greeting} use this code to verify your Pryme Labs account${phone_hint ? ` for the phone ending in <strong style="color:#111111;">${escHtml(phone_hint)}</strong>` : ''}.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafc;border:1px solid #d9dde5;border-radius:14px;margin:0 0 26px 0;"><tr><td align="center" style="padding:28px 24px;">
+      <div style="font-size:12px;color:#9aa0aa;font-weight:700;letter-spacing:4px;margin-bottom:10px;font-family:Arial,Helvetica,sans-serif;">YOUR CODE</div>
+      <div style="font-size:36px;font-weight:800;letter-spacing:10px;color:#002b63;font-family:Arial,Helvetica,sans-serif;">${escHtml(code)}</div>
+    </td></tr></table>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#8a8f99;font-family:Arial,Helvetica,sans-serif;">This code expires in <strong style="color:#333333;">10 minutes</strong>. We sent it by email because SMS delivery is temporarily unavailable.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fffaf0;border:1px solid #d6a72a;border-radius:14px;"><tr><td style="padding:18px 22px;font-size:14px;line-height:1.6;color:#9a7b1f;font-family:Arial,Helvetica,sans-serif;">If you did not request this code, you can safely ignore this email.</td></tr></table>`
+  return prymeEmailShell({ lang: 'en', rightLabel: 'VERIFY', preheader: 'Your Pryme Labs verification code.', body })
+}
+
+async function ownerSmsFallbackEmail(env, { message, error, status }) {
+  if (!env.OWNER_EMAIL) return { skipped: true }
+  const detail = typeof error === 'string' ? error : JSON.stringify(error || {})
+  return sendEmail(env, {
+    to: env.OWNER_EMAIL,
+    subject: 'Pryme Labs SMS alert fallback',
+    html: `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#09090b;font-family:Inter,Arial,sans-serif">
+<div style="max-width:560px;margin:0 auto;background:#12121f;border:1px solid #1e1e2e;border-radius:16px;overflow:hidden">
+  <div style="padding:22px 24px;border-bottom:1px solid #1e1e2e">
+    <div style="color:#f59e0b;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.14em;margin-bottom:8px">SMS Alert Fallback</div>
+    <h2 style="color:#fff;font-size:20px;margin:0">An owner SMS alert could not be sent</h2>
+  </div>
+  <div style="padding:24px">
+    <p style="color:#a1a1aa;font-size:14px;line-height:1.6;margin:0 0 16px">The website tried to send this SMS alert, but the SMS provider returned an error. The alert is shown here by email so you still see it.</p>
+    <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;color:#e4e4e7;font-size:14px;line-height:1.6;white-space:pre-wrap">${escHtml(message)}</div>
+    <div style="margin-top:16px;color:#71717a;font-size:12px;line-height:1.5">
+      ${status ? `Status: ${escHtml(status)}<br>` : ''}
+      Error: ${escHtml(detail).slice(0, 1200)}
+    </div>
+    <div style="margin-top:20px"><a href="https://prymelabs.cc/admin" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:11px 22px;border-radius:8px;text-decoration:none;font-size:13px">Open Dashboard</a></div>
+  </div>
+</div>
+</body></html>`,
+  })
+}
+
+async function smsFailure(env, result, { message, to, recipient }) {
+  const ownerRecipient = smsPhone(env.OWNER_PHONE)
+  const ownerAlert = !to || (recipient && ownerRecipient && recipient === ownerRecipient)
+  if (!ownerAlert) return result
+  const fallback = await ownerSmsFallbackEmail(env, {
+    message,
+    error: result.error,
+    status: result.status,
+  }).catch(err => ({ error: err?.message || String(err || 'Email fallback failed') }))
+  return {
+    ...result,
+    fallback_email: fallback?.ok === true,
+    fallback_email_error: fallback?.ok ? undefined : fallback?.error,
+  }
+}
+
 // sendSMS(env, { message, to })
 // - to: recipient phone; normalized to E.164 before sending
 //        defaults to env.OWNER_PHONE if omitted (owner alert)
 export async function sendSMS(env, { message, to } = {}) {
-  if (!env.QUO_API_KEY || !env.QUO_PHONE_NUMBER) {
-    return { skipped: true, error: 'SMS sender is not configured', status: 503 }
-  }
   const recipient = smsPhone(to || env.OWNER_PHONE)
   const content = String(message || '')
   if (!recipient || !/^\+\d{10,15}$/.test(recipient)) {
-    return { skipped: true, error: 'Invalid SMS recipient phone number', status: 400 }
+    return smsFailure(env, { skipped: true, error: 'Invalid SMS recipient phone number', status: 400 }, { message: content, to, recipient })
   }
   if (!content.trim()) {
-    return { skipped: true, error: 'Missing SMS message content', status: 400 }
+    return smsFailure(env, { skipped: true, error: 'Missing SMS message content', status: 400 }, { message: content, to, recipient })
+  }
+  if (!env.QUO_API_KEY || !env.QUO_PHONE_NUMBER) {
+    return smsFailure(env, { skipped: true, error: 'SMS sender is not configured', status: 503 }, { message: content, to, recipient })
   }
   if (content.length > 1600) return { error: 'SMS message exceeds provider limit', status: 400 }
   try {
@@ -875,11 +933,11 @@ export async function sendSMS(env, { message, to } = {}) {
     if (res.ok) return { ok: true, status: res.status }
     const detail = await res.text()
     console.error('SMS failed', { status: res.status, detail })
-    return { error: detail || `SMS provider returned ${res.status}`, status: res.status }
+    return smsFailure(env, { error: detail || `SMS provider returned ${res.status}`, status: res.status }, { message: content, to, recipient })
   } catch (err) {
     const detail = err?.message || String(err || 'Unknown SMS network error')
     console.error('SMS request failed', { detail })
-    return { error: `SMS request failed: ${detail}`, status: 502 }
+    return smsFailure(env, { error: `SMS request failed: ${detail}`, status: 502 }, { message: content, to, recipient })
   }
 }
 

@@ -18,6 +18,7 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [hint, setHint] = useState('')
+  const [delivery, setDelivery] = useState('sms')
 
   if (!user || !token || user.phone_verified === true || dismissed) return null
 
@@ -58,7 +59,8 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
         return
       }
       setSent(true)
-      setHint(d.phone_hint || '')
+      setDelivery(d.delivery || 'sms')
+      setHint(d.delivery === 'email' ? d.email_hint || '' : d.phone_hint || '')
     } catch {
       setErr('Network error sending verification code')
     } finally {
@@ -125,7 +127,11 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
           </button>
         ) : (
           <form onSubmit={verifyCode} className="space-y-3">
-            <p className="text-zinc-500 text-xs">Enter the 6-digit code sent to the phone ending in {hint || 'your account'}.</p>
+            <p className="text-zinc-500 text-xs">
+              {delivery === 'email'
+                ? `Enter the 6-digit code sent to ${hint || 'your account email'}.`
+                : `Enter the 6-digit code sent to the phone ending in ${hint || 'your account'}.`}
+            </p>
             <input value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="000000" inputMode="numeric" autoComplete="one-time-code"
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white text-center tracking-[0.35em] font-mono placeholder-zinc-600 focus:outline-none focus:border-blue-500" />
