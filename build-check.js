@@ -1,4 +1,5 @@
-const { build } = require('vite')
+import { build } from 'vite'
+
 build({ logLevel: 'info' }).then(() => {
   console.log('BUILD SUCCESS')
   process.exit(0)

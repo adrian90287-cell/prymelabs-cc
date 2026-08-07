@@ -102,9 +102,9 @@ export async function onRequestGet({ request, env }) {
     check(auditCols.includes('action') && auditCols.includes('created_at'),
       'Admin audit log table', 'Sensitive admin changes are being recorded.', 'warning'),
     check(userCols.includes('phone_norm') && userCols.includes('phone_verified'),
-      'Customer phone security columns', 'Customer phone numbers can be normalized and prepared for verification.', 'warning'),
+      'Customer eligibility columns', 'Customer access eligibility can be stored for restricted sections.', 'warning'),
     check(phoneVerificationTable,
-      'Phone verification table', 'SMS verification codes can be created and expired safely.', 'warning'),
+      'Customer verification table', 'Email verification codes can be created and expired safely.', 'warning'),
     check(userIndexes.includes('idx_users_phone_norm_unique'),
       'Duplicate phone lock', 'The database blocks multiple customer accounts from sharing the same normalized phone number.', 'warning'),
     check(duplicatePhones === 0 || duplicatePhones === null,
@@ -122,8 +122,8 @@ export async function onRequestGet({ request, env }) {
     check(Boolean(env.JWT_SECRET), 'Admin token secret', 'JWT secret is configured server-side.', 'critical'),
     check(Boolean(env.BREVO_API_KEY), 'Email sender', 'Email service is configured for invites and password resets.', 'warning'),
     check(Boolean(env.OWNER_EMAIL), 'Owner alert email', 'Owner email is configured for security/admin alerts.', 'warning'),
-    check(Boolean(env.QUO_API_KEY && env.QUO_PHONE_NUMBER), 'SMS sender', 'SMS service is configured for customer phone verification.', 'warning'),
-    check(Boolean(env.OWNER_PHONE), 'Owner SMS number', 'Owner phone is configured for SMS alerts.', 'info'),
+    check(Boolean(env.QUO_API_KEY && env.QUO_PHONE_NUMBER), 'SMS sender', 'SMS service is configured for owner/admin notification alerts.', 'warning'),
+    check(Boolean(env.OWNER_PHONE), 'Owner SMS number', 'Owner phone is configured for SMS alerts when Quo accepts API messages.', 'info'),
   ]
 
   const criticalOpen = checks.filter(c => !c.ok && c.severity === 'critical').length
