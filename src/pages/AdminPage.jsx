@@ -761,7 +761,12 @@ function OrderRow({ order, onUpdate, onDelete, selectable, selected, onToggle })
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Failed to send reminder'); return }
-      showToast(data.sms ? '✉ Reminder emailed + texted to customer' : '✉ Payment reminder emailed to customer', 'success')
+      showToast(
+        data.sms ? '✉ Reminder emailed + texted to customer'
+          : data.sms_error ? '✉ Reminder emailed, but SMS failed'
+          : '✉ Payment reminder emailed to customer',
+        data.sms_error ? 'warning' : 'success'
+      )
     } catch { setErr('Network error') }
     finally { setBusy(false) }
   }

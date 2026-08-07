@@ -315,15 +315,17 @@ export async function onRequestPost({ request, env, waitUntil }) {
         const alertRows = alertProducts.map(p =>
           `<tr><td style="padding:8px 12px;border-bottom:1px solid #1e1e2e;color:#e4e4e7">${p.name}</td><td style="padding:8px 12px;border-bottom:1px solid #1e1e2e;color:#f59e0b;font-weight:700;text-align:center">${p.qty}</td><td style="padding:8px 12px;border-bottom:1px solid #1e1e2e;color:#71717a;text-align:center">${p.threshold}</td></tr>`
         ).join('')
-        sendEmail(env, {
-          to: env.OWNER_EMAIL,
-          subject: `⚠️ Low Stock Alert — ${alertProducts.length} product${alertProducts.length > 1 ? 's' : ''} need restocking`,
-          html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#09090b;font-family:Inter,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;padding:32px 16px"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#12121f;border-radius:16px 16px 0 0;padding:24px 32px;border-bottom:1px solid #1e1e2e"><img src="https://prymelabs.cc/logo-mark.png" alt="" width="17" height="18" style="vertical-align:middle;margin-right:6px" /><span style="color:#fff;font-size:20px;font-weight:800;letter-spacing:0.12em;vertical-align:middle">PRYME<span style="color:#3b82f6">LABS</span></span></td></tr><tr><td style="background:#12121f;padding:32px"><p style="color:#f59e0b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin:0 0 8px">Low Stock Alert</p><h2 style="color:#fff;font-size:20px;margin:0 0 20px">Products running low after order ${orderNumber}</h2><table width="100%" cellpadding="0" cellspacing="0"><thead><tr><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:left">Product</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Current Qty</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Alert Threshold</th></tr></thead><tbody>${alertRows}</tbody></table></td></tr></table></td></tr></table></body></html>`,
-        }).catch(() => {})
+        if (env.OWNER_EMAIL) {
+          waitUntil(sendEmail(env, {
+            to: env.OWNER_EMAIL,
+            subject: `⚠️ Low Stock Alert — ${alertProducts.length} product${alertProducts.length > 1 ? 's' : ''} need restocking`,
+            html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#09090b;font-family:Inter,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;padding:32px 16px"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#12121f;border-radius:16px 16px 0 0;padding:24px 32px;border-bottom:1px solid #1e1e2e"><img src="https://prymelabs.cc/logo-mark.png" alt="" width="17" height="18" style="vertical-align:middle;margin-right:6px" /><span style="color:#fff;font-size:20px;font-weight:800;letter-spacing:0.12em;vertical-align:middle">PRYME<span style="color:#3b82f6">LABS</span></span></td></tr><tr><td style="background:#12121f;padding:32px"><p style="color:#f59e0b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin:0 0 8px">Low Stock Alert</p><h2 style="color:#fff;font-size:20px;margin:0 0 20px">Products running low after order ${orderNumber}</h2><table width="100%" cellpadding="0" cellspacing="0"><thead><tr><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:left">Product</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Current Qty</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Alert Threshold</th></tr></thead><tbody>${alertRows}</tbody></table></td></tr></table></td></tr></table></body></html>`,
+          }).catch(() => {}))
+        }
         // SMS low stock alert to owner
-        sendSMS(env, {
+        waitUntil(sendSMS(env, {
           message: `⚠️ Low Stock after order ${orderNumber}:\n${alertProducts.map(p => `• ${p.name}: ${p.qty} left (alert at ${p.threshold})`).join('\n')}\nRestock soon: https://prymelabs.cc/admin`,
-        }).catch(() => {})
+        }).catch(() => {}))
       }
     }
   }

@@ -31,7 +31,7 @@ async function tokenFor(row, env) {
   }, env.JWT_SECRET)
 }
 
-export async function onRequestPost({ request, env, waitUntil }) {
+export async function onRequestPost({ request, env }) {
   const auth = request.headers.get('Authorization') || ''
   const payload = auth.startsWith('Bearer ') ? await verifyJWT(auth.slice(7), env) : null
   if (!payload) return json({ error: 'Unauthorized' }, 401)
@@ -68,10 +68,16 @@ export async function onRequestPost({ request, env, waitUntil }) {
     'INSERT INTO phone_verifications (user_id, phone_norm, code_hash, expires_at, sent_at) VALUES (?, ?, ?, ?, ?)'
   ).bind(user.id, phoneNorm, codeHash, now + 10 * 60, now).run()
 
-  waitUntil?.(sendSMS(env, {
+  const smsResult = await sendSMS(env, {
     to,
     message: `Pryme Labs verification code: ${code}. It expires in 10 minutes.`,
-  }).catch(() => {}))
+  })
+  if (!smsResult?.ok) {
+    await env.DB.prepare('UPDATE phone_verifications SET used = 1 WHERE user_id = ? AND sent_at = ? AND used = 0')
+      .bind(user.id, now).run().catch(() => {})
+    const status = smsResult?.skipped ? 503 : 502
+    return json({ error: smsResult?.skipped ? 'SMS verification is not configured yet' : 'SMS failed to send. Please check SMS provider settings.' }, status)
+  }
 
   return json({ ok: true, expires_minutes: 10, phone_hint: phoneNorm.slice(-4) })
 }

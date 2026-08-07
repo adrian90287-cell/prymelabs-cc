@@ -5,7 +5,7 @@ import { sendEmail, sendSMS, paymentReminderHtml, paymentReminderHtmlEs } from '
 
 const PAYMENT_LABEL = { zelle: 'Zelle', cashapp: 'Cash App', venmo: 'Venmo' }
 
-export async function onRequestPost({ request, env, waitUntil }) {
+export async function onRequestPost({ request, env }) {
   if (!await adminAuth(request, env)) return json({ error: 'Unauthorized' }, 401)
 
   let body
@@ -71,18 +71,25 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   // Optional SMS if the customer left a phone number
   const phone = shipping?.phone?.trim()
+  let smsResult = null
   if (phone) {
-    waitUntil(sendSMS(env, {
+    smsResult = await sendSMS(env, {
       to: phone,
       message: isEs
         ? `Hola ${firstName}, un recordatorio amistoso: tu pedido de Pryme Labs ${order.order_number} ($${total.toFixed(2)}) aún espera el pago vía ${method}. Paga a: ${paymentHandle} (memo: ${order.order_number}). ¡Gracias!`
         : `Hi ${firstName}, friendly reminder: your Pryme Labs order ${order.order_number} ($${total.toFixed(2)}) is still awaiting payment via ${method}. Pay to: ${paymentHandle} (memo: ${order.order_number}). Thank you!`,
-    }).catch(() => {}))
+    })
   }
 
   if (emailResult?.error) return json({ error: 'Email failed to send', detail: emailResult.error }, 502)
 
-  return json({ ok: true, emailed: !emailResult?.skipped, sms: !!phone })
+  return json({
+    ok: true,
+    emailed: !emailResult?.skipped,
+    sms: smsResult?.ok === true,
+    sms_error: smsResult?.error || null,
+    sms_skipped: smsResult?.skipped === true,
+  })
 }
 
 export async function onRequestOptions() {

@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { LanguageProvider } from './context/LanguageContext'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
@@ -33,6 +33,12 @@ function PageFallback() {
   )
 }
 
+function GlobalPhoneVerificationPrompt() {
+  const { pathname } = useLocation()
+  if (pathname.startsWith('/admin')) return null
+  return <PhoneVerificationPrompt />
+}
+
 export default function App() {
   return (
     <LanguageProvider>
@@ -41,7 +47,7 @@ export default function App() {
           <BrowserRouter>
             <AgeGate />
             <ScrollToTop />
-            <PhoneVerificationPrompt />
+            <GlobalPhoneVerificationPrompt />
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<HomePage />} />
