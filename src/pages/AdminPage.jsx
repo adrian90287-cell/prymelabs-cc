@@ -3,6 +3,42 @@ import { taggableCollections, productCollections } from '../lib/collections'
 import { computeDisplayPricing } from '../../functions/_utils/pricing.js'
 import { resolveSaleConfig, saleAmountForDept } from '../../functions/_utils/sale.js'
 
+const ADMIN_TOKEN_KEY = 'pl_admin_token'
+const ADMIN_USER_KEY = 'pl_admin'
+
+function getAdminToken() {
+  try {
+    const sessionToken = sessionStorage.getItem(ADMIN_TOKEN_KEY)
+    if (sessionToken) return sessionToken
+    const savedToken = localStorage.getItem(ADMIN_TOKEN_KEY)
+    if (savedToken) sessionStorage.setItem(ADMIN_TOKEN_KEY, savedToken)
+    return savedToken
+  } catch {
+    return null
+  }
+}
+
+function storeAdminSession(token, admin) {
+  try {
+    sessionStorage.setItem(ADMIN_TOKEN_KEY, token)
+    localStorage.setItem(ADMIN_TOKEN_KEY, token)
+    if (admin) {
+      const value = JSON.stringify(admin)
+      sessionStorage.setItem(ADMIN_USER_KEY, value)
+      localStorage.setItem(ADMIN_USER_KEY, value)
+    }
+  } catch {}
+}
+
+function clearAdminSession() {
+  try {
+    sessionStorage.removeItem(ADMIN_TOKEN_KEY)
+    sessionStorage.removeItem(ADMIN_USER_KEY)
+    localStorage.removeItem(ADMIN_TOKEN_KEY)
+    localStorage.removeItem(ADMIN_USER_KEY)
+  } catch {}
+}
+
 const ADMIN_PERMISSION_LABELS = {
   orders: 'Orders',
   willcall: 'Will Call',
@@ -197,7 +233,7 @@ function TrackingPanel({ order, onUpdate }) {
   const [busy, setBusy] = useState(false)
   const [showEvents, setShowEvents] = useState(false)
   const showToast = useToast()
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
 
   let events = []
   try { events = JSON.parse(order.tracking_events_json || '[]') } catch {}
@@ -296,7 +332,7 @@ function EasyPostPanel({ order, onRefresh, onClose, reship = false }) {
   const [label, setLabel]       = useState(null)
   const [busy, setBusy]         = useState(false)
   const [err, setErr]           = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast  = useToast()
 
   // Editable ship-to address — expanded by default when reshipping so the admin
@@ -713,7 +749,7 @@ function OrderRow({ order, onUpdate, onDelete, selectable, selected, onToggle })
       setTracking({ carrier: order.tracking.carrier || 'USPS', number: order.tracking.number })
     }
   }, [order.tracking?.carrier, order.tracking?.number])
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const trashOrder = async (e) => {
@@ -1298,7 +1334,7 @@ function ArchiveSection({ title, orders, onRefresh, defaultOpen = true, accentCo
 function RefreshAllTracking({ onRefresh }) {
   const [busy, setBusy] = useState(false)
   const showToast = useToast()
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
 
   const run = async () => {
     setBusy(true)
@@ -1329,7 +1365,7 @@ function RefreshAllTracking({ onRefresh }) {
 function RecoverLabels({ onRefresh }) {
   const [busy, setBusy] = useState(false)
   const showToast = useToast()
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
 
   const run = async () => {
     if (!confirm('Look up shipping labels from EasyPost for older orders that don\'t have a Print Label button yet? This matches each order\'s tracking number to its EasyPost shipment and saves the label PDF link.')) return
@@ -1358,7 +1394,7 @@ function RecoverLabels({ onRefresh }) {
 
 // Schedule a free USPS package pickup at the ship-from address via EasyPost.
 function PickupScheduler() {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const [open, setOpen] = useState(false)
   const [last, setLast] = useState(null)
@@ -1455,7 +1491,7 @@ function OrdersTab({ data, loading, onRefresh, onSwitchTab }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const orders = data?.orders || []
   const stats = data?.stats || {}
@@ -1634,7 +1670,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [imgDrag, setImgDrag] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const set = f => e => setForm(p => ({ ...p, [f]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
@@ -1843,7 +1879,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               try {
                 const res = await fetch('/api/admin/generate-description', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('pl_admin_token')}` },
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
                   body: JSON.stringify({ name: form.name, category: form.category, size: form.size, department: form.department, field: 'tagline' }),
                 })
                 const data = await res.json()
@@ -1900,7 +1936,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               try {
                 const res = await fetch('/api/admin/generate-description', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('pl_admin_token')}` },
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
                   body: JSON.stringify({ name: form.name, category: form.category, size: form.size, department: form.department }),
                 })
                 const data = await res.json()
@@ -1943,7 +1979,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
 function InlineQty({ product, field, onSaved }) {
   const [val, setVal] = useState(String(product[field] ?? ''))
   const [busy, setBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const save = async () => {
@@ -2065,7 +2101,7 @@ function InventoryTab() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkSaleAmount, setBulkSaleAmount] = useState('')
   const [bulkSaleBusy, setBulkSaleBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const load = useCallback(async () => {
@@ -2851,7 +2887,7 @@ function PromoForm({ initial, defaultType, onSave, onCancel }) {
   } : { ...EMPTY_PROMO, type: defaultType || 'promo' })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const set = f => e => setForm(p => ({ ...p, [f]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
@@ -2965,7 +3001,7 @@ function PromoSection({ title, addType, codes, onRefresh, showType }) {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const filtered = codes
 
@@ -3085,7 +3121,7 @@ function PromoSection({ title, addType, codes, onRefresh, showType }) {
 function PromosTab() {
   const [codes, setCodes] = useState([])
   const [loading, setLoading] = useState(true)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -3127,7 +3163,7 @@ function ShippingRateForm({ initial, onSave, onCancel }) {
   const [form, setForm] = useState(initial || EMPTY_RATE)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const set = f => e => setForm(p => ({ ...p, [f]: e.target.value }))
@@ -3210,7 +3246,7 @@ const HERO_KEY = { 'Peptides': 'home_hero_peptides', 'Health & Wellness': 'home_
 // Products tab when that department is selected. Stored in settings and served
 // to the home page via /api/storefront/home-media.
 function DeptHeroCard({ department, onSaved }) {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const key = HERO_KEY[department]
   const [img, setImg] = useState('')
@@ -3294,7 +3330,7 @@ function DeptHeroCard({ department, onSaved }) {
 // adminToken/showToast from its parent, so it can't interfere with the rest
 // of SettingsTab's state.
 function TwoFactorSettings() {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const [status, setStatus] = useState(null) // { enabled } | null while loading
   const [setup, setSetup] = useState(null) // { secret, otpauthUrl } while mid-setup
@@ -3453,7 +3489,7 @@ function SettingsTab() {
   const [fsBannerBusy, setFsBannerBusy] = useState(false)
   const [fsAllEnabled, setFsAllEnabled] = useState(false) // free shipping on ALL orders
   const [fsAllBusy, setFsAllBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   // Handle OneDrive connect redirect result
@@ -4528,7 +4564,7 @@ function AnnouncementsTab() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
   const [err, setErr] = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
 
   const handleImageFile = (file) => {
     if (!file || !file.type.startsWith('image/')) { setErr('Please select an image file'); return }
@@ -4692,7 +4728,7 @@ function SuggestionsTab() {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const load = useCallback(async () => {
@@ -4820,7 +4856,7 @@ function TrashTab() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const load = useCallback(async () => {
@@ -4935,7 +4971,7 @@ function CoaForm({ initial, onSaved, onCancel }) {
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const save = async () => {
@@ -4996,7 +5032,7 @@ function CoaForm({ initial, onSaved, onCancel }) {
 function CoaCard({ doc, productNames, onChanged }) {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const linked = productNames.has(doc.title.trim().toLowerCase())
@@ -5070,7 +5106,7 @@ function CoaTab() {
   const [adding, setAdding] = useState(false)
   const [globalBusy, setGlobalBusy] = useState(false)
   const [collapsed, setCollapsed] = useState(new Set())
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const load = useCallback(async () => {
@@ -5194,7 +5230,7 @@ function SubscriberCard({ s, sevenDaysAgo, onSaved, onDeleted }) {
   const [busy, setBusy] = useState(false)
   const [resetInfo, setResetInfo] = useState(null)
   const [copied, setCopied] = useState(false)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const isNew = s.created_at && s.created_at >= sevenDaysAgo
 
@@ -5390,7 +5426,7 @@ function SubscribersTab({ onNewCount, onTotalCount }) {
   const [subscribers, setSubscribers] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -5574,7 +5610,7 @@ function CancelledOrdersTab({ data, loading, onRefresh }) {
 function AnalyticsTab() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
 
   useEffect(() => {
     fetch('/api/admin/analytics', { headers: { Authorization: `Bearer ${adminToken}` } })
@@ -5627,7 +5663,7 @@ function AnalyticsTab() {
 function ReviewsTab() {
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   const load = useCallback(async () => {
@@ -5713,7 +5749,7 @@ function WillCallTab({ onOrderCreated }) {
   const [promos, setPromos] = useState([])
   const [promoInput, setPromoInput] = useState('')
   const [activeCode, setActiveCode] = useState('')   // the store's advertised promo, auto-applied
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
 
   useEffect(() => {
@@ -6082,7 +6118,7 @@ function WillCallTab({ onOrderCreated }) {
 
 function AdminUsersTab() {
   const showToast = useToast()
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const blank = { id: null, name: '', username: '', email: '', password: '', permissions: [], is_active: true, send_invite: true }
   const [users, setUsers] = useState([])
   const [form, setForm] = useState(blank)
@@ -6269,7 +6305,7 @@ function AdminUsersTab() {
 }
 
 function AdminActionCenterTab({ onSwitchTab }) {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -6353,7 +6389,7 @@ function AdminActionCenterTab({ onSwitchTab }) {
 }
 
 function AdminVerificationTab() {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const [customers, setCustomers] = useState([])
   const [filter, setFilter] = useState('unverified')
@@ -6443,7 +6479,7 @@ function AdminVerificationTab() {
 }
 
 function AdminWaitlistsTab() {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const showToast = useToast()
   const [signups, setSignups] = useState([])
   const [summary, setSummary] = useState([])
@@ -6581,7 +6617,7 @@ function AdminWaitlistsTab() {
 
 function AdminAccountTab({ adminMe, onProfileUpdated, onPasswordChanged }) {
   const showToast = useToast()
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const [form, setForm] = useState({ username: adminMe?.username || 'owner', email: adminMe?.email || '', current_password: '', new_password: '' })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -6722,7 +6758,7 @@ function AdminAccountTab({ adminMe, onProfileUpdated, onPasswordChanged }) {
 }
 
 function AdminAuditTab() {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -6793,7 +6829,7 @@ function AdminAuditTab() {
 
 function AdminExportsTab() {
   const showToast = useToast()
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const [downloading, setDownloading] = useState('')
 
   const downloadExport = async (type) => {
@@ -6857,7 +6893,7 @@ function AdminExportsTab() {
 }
 
 function AdminSystemHealthTab() {
-  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const adminToken = getAdminToken()
   const [health, setHealth] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -6956,7 +6992,7 @@ function urlB64ToUint8Array(base64String) {
 }
 
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(() => !!sessionStorage.getItem('pl_admin_token'))
+  const [authed, setAuthed] = useState(() => !!getAdminToken())
   const [adminMe, setAdminMe] = useState(null)
   const [loginUser, setLoginUser] = useState('')
   const [pw, setPw] = useState('')
@@ -6974,12 +7010,12 @@ export default function AdminPage() {
   const [pushState, setPushState] = useState('idle') // 'idle' | 'loading' | 'enabled' | 'denied' | 'unsupported'
 
   const load = useCallback(async () => {
-    const jwt = sessionStorage.getItem('pl_admin_token')
+    const jwt = getAdminToken()
     if (!jwt) return
     setLoading(true)
     try {
       const res = await fetch('/api/admin/dashboard', { headers: { Authorization: `Bearer ${jwt}` } })
-      if (res.status === 401) { sessionStorage.removeItem('pl_admin_token'); sessionStorage.removeItem('pl_admin'); setAuthed(false); return }
+      if (res.status === 401) { clearAdminSession(); setAuthed(false); return }
       const d = await res.json()
       setData(d)
     } catch {}
@@ -6987,13 +7023,13 @@ export default function AdminPage() {
   }, [])
 
   const loadSession = useCallback(async () => {
-    const jwt = sessionStorage.getItem('pl_admin_token')
+    const jwt = getAdminToken()
     if (!jwt) return
     try {
       const res = await fetch('/api/admin/session', { headers: { Authorization: `Bearer ${jwt}` } })
       const d = await res.json()
       if (res.ok) setAdminMe(d.admin || { owner: true, role: 'owner', permissions: ['*'] })
-      else { sessionStorage.removeItem('pl_admin_token'); setAdminMe(null); setAuthed(false) }
+      else { clearAdminSession(); setAdminMe(null); setAuthed(false) }
     } catch {}
   }, [])
 
@@ -7013,7 +7049,7 @@ export default function AdminPage() {
   }, [])
 
   const enablePush = useCallback(async () => {
-    const token = sessionStorage.getItem('pl_admin_token')
+    const token = getAdminToken()
     if (!token) return
     setPushState('loading')
     try {
@@ -7047,7 +7083,7 @@ export default function AdminPage() {
   }, [])
 
   const disablePush = useCallback(async () => {
-    const token = sessionStorage.getItem('pl_admin_token')
+    const token = getAdminToken()
     try {
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()
@@ -7119,7 +7155,7 @@ export default function AdminPage() {
       if (res.ok && data.requires2fa) {
         setPendingToken(data.pendingToken)
       } else if (res.ok && data.token) {
-        sessionStorage.setItem('pl_admin_token', data.token)
+        storeAdminSession(data.token, data.admin || null)
         setPw(''); setLoginUser(''); setAdminMe(data.admin || null)
         setAuthed(true)
       } else if (res.status === 429) {
@@ -7141,7 +7177,7 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (res.ok && data.token) {
-        sessionStorage.setItem('pl_admin_token', data.token)
+        storeAdminSession(data.token, data.admin || null)
         setPw(''); setLoginUser(''); setPendingToken(null); setTwoFACode(''); setAdminMe(data.admin || null)
         setAuthed(true)
       } else if (res.status === 429) {
@@ -7364,7 +7400,7 @@ export default function AdminPage() {
                 <div className="text-zinc-600 text-[10px] leading-tight">{adminMe.owner ? 'Full access' : 'Limited admin'}</div>
               </div>
             )}
-            <button onClick={() => { sessionStorage.removeItem('pl_admin_token'); sessionStorage.removeItem('pl_admin'); localStorage.removeItem('pl_admin_pw'); localStorage.removeItem('pl_admin_bypass'); setAdminMe(null); setAuthed(false) }}
+            <button onClick={() => { clearAdminSession(); localStorage.removeItem('pl_admin_pw'); localStorage.removeItem('pl_admin_bypass'); setAdminMe(null); setAuthed(false) }}
               className="text-xs text-zinc-500 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg hover:bg-zinc-800">
               Sign Out
             </button>
@@ -7414,7 +7450,7 @@ export default function AdminPage() {
         {tab === 'account' && <AdminAccountTab
           adminMe={adminMe}
           onProfileUpdated={(next) => setAdminMe(p => ({ ...p, ...next }))}
-          onPasswordChanged={() => { sessionStorage.removeItem('pl_admin_token'); setAdminMe(null); setAuthed(false) }}
+          onPasswordChanged={() => { clearAdminSession(); setAdminMe(null); setAuthed(false) }}
         />}
       </main>
     </div>
