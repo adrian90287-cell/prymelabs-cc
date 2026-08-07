@@ -1987,14 +1987,58 @@ function Modal({ open, onClose, children }) {
   )
 }
 
+function AdminProductPreview({ product, effective, onClose }) {
+  if (!product) return null
+  const photos = parsePhotos(product)
+  const img = photos[0] || product.image_url
+  const releaseAt = Number(product.release_at || 0)
+  const isScheduled = releaseAt > Math.floor(Date.now() / 1000)
+  const isDraft = product.is_draft === 1 || product.is_draft === true
+  const inStock = product.in_stock !== 0 && product.in_stock !== false
+  const price = effective?.price ?? Number(product.price || 0)
+  const was = effective?.was
+
+  return (
+    <Modal open={!!product} onClose={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-3xl overflow-hidden">
+        <div className="relative bg-zinc-950 h-72 flex items-center justify-center">
+          {img ? <img src={img} alt="" className="h-full w-full object-contain p-5" /> : <div className="text-zinc-700 text-5xl">🏬</div>}
+          <button onClick={onClose} className="absolute top-3 right-3 w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300">×</button>
+          <div className="absolute left-3 bottom-3 flex gap-2 flex-wrap">
+            <span className={`text-xs font-black px-2 py-1 rounded-full border ${inStock ? 'bg-green-500/15 border-green-500/30 text-green-400' : 'bg-red-500/15 border-red-500/30 text-red-400'}`}>{inStock ? 'In Stock' : 'Out of Stock'}</span>
+            {isDraft && <span className="text-xs font-black px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300">Draft Hidden</span>}
+            {isScheduled && <span className="text-xs font-black px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300">Scheduled</span>}
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <div className="text-blue-300 text-xs font-black uppercase tracking-wider">{product.department || 'Peptides'} · {product.category}</div>
+            <h3 className="text-white font-black text-2xl mt-1">{product.name}</h3>
+            {product.size && <div className="text-zinc-500 text-sm mt-1">{product.size}</div>}
+          </div>
+          <div className="flex items-baseline gap-2">
+            {was && Number(was) > Number(price) && <span className="text-red-400 line-through font-bold">${Number(was).toFixed(2)}</span>}
+            <span className="text-amber-400 font-black text-3xl">${Number(price).toFixed(2)}</span>
+          </div>
+          {product.description && <p className="text-zinc-400 text-sm leading-relaxed">{product.description}</p>}
+          {isScheduled && <p className="text-blue-300 text-sm">Goes live automatically on {formatDate(releaseAt)}.</p>}
+          <p className="text-zinc-600 text-xs">Preview is admin-only. Drafts and future scheduled products remain hidden from customers.</p>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 function InventoryTab() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null)
   const [adding, setAdding] = useState(false)
+  const [previewing, setPreviewing] = useState(null)
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('all')
   const [catFilter, setCatFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [heroImgs, setHeroImgs] = useState({}) // department → hero photo (for tab thumbnails)
   const [sortOrder, setSortOrder] = useState('az')
   const [translating, setTranslating] = useState(false)
@@ -2281,6 +2325,10 @@ function InventoryTab() {
   const filtered = products.filter(p => {
     if (deptFilter !== 'all' && deptOf(p) !== deptFilter) return false
     if (catFilter !== 'all' && p.category !== catFilter) return false
+    if (statusFilter === 'draft' && Number(p.is_draft || 0) !== 1) return false
+    if (statusFilter === 'scheduled' && !(p.release_at && Number(p.release_at) > Math.floor(Date.now() / 1000))) return false
+    if (statusFilter === 'live' && (Number(p.is_draft || 0) === 1 || (p.release_at && Number(p.release_at) > Math.floor(Date.now() / 1000)))) return false
+    if (statusFilter === 'low' && !(p.low_stock_threshold > 0 && p.stock_qty > 0 && p.stock_qty <= p.low_stock_threshold)) return false
     if (search) return p.name?.toLowerCase().includes(search.toLowerCase()) || p.code?.toLowerCase().includes(search.toLowerCase())
     return true
   })
@@ -2366,6 +2414,7 @@ function InventoryTab() {
           onCancel={() => { setAdding(false); setEditing(null) }}
         />
       </Modal>
+      <AdminProductPreview product={previewing} effective={previewing ? computeEffective(previewing) : null} onClose={() => setPreviewing(null)} />
 
       {/* ── Per-Department Sales ──────────────────────────────────────────── */}
       <div className={`border rounded-xl px-4 py-3 transition-colors bg-zinc-900 border-zinc-800`}>
@@ -2551,6 +2600,13 @@ function InventoryTab() {
           className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-sm" />
         <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className={inp + ' cursor-pointer'}>
           {['all', ...CATEGORIES].map(c => <option key={c} value={c}>{c === 'all' ? 'All Categories' : c}</option>)}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={inp + ' cursor-pointer'}>
+          <option value="all">All Statuses</option>
+          <option value="live">Live</option>
+          <option value="draft">Draft</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="low">Low Stock</option>
         </select>
         <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className={inp + ' cursor-pointer'}>
           <option value="default">Default Order</option>
@@ -2754,6 +2810,8 @@ function InventoryTab() {
                     </td>
                     <td className="px-3 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button onClick={() => setPreviewing(p)}
+                          className="text-zinc-500 hover:text-blue-300 transition-colors px-2 py-1 rounded hover:bg-zinc-700 text-xs font-semibold">Preview</button>
                         <button onClick={() => { setEditing(p); setAdding(false) }}
                           className="text-zinc-500 hover:text-white transition-colors px-2 py-1 rounded hover:bg-zinc-700 text-xs font-semibold">Edit</button>
                         <button onClick={() => deleteProduct(p.id)}
@@ -6229,8 +6287,9 @@ function AdminActionCenterTab({ onSwitchTab }) {
     { label: 'Low Stock', value: data?.cards?.low_stock || 0, tab: 'inventory', color: 'text-red-300' },
     { label: 'Unverified Customers', value: data?.cards?.unverified_customers || 0, tab: 'verification', color: 'text-blue-300' },
     { label: 'New Subscribers', value: data?.cards?.new_subscribers_7d || 0, tab: 'subscribers', color: 'text-green-300' },
-    { label: 'Waitlist Signups', value: data?.cards?.department_waitlist || 0, tab: 'exports', color: 'text-purple-300' },
+    { label: 'Waitlist Signups', value: data?.cards?.department_waitlist || 0, tab: 'waitlists', color: 'text-purple-300' },
     { label: 'Audit Events', value: data?.cards?.audit_events_7d || 0, tab: 'audit', color: 'text-zinc-300' },
+    { label: 'Staff 2FA Warnings', value: data?.cards?.staff_2fa_warnings || 0, tab: 'health', color: 'text-amber-300' },
   ]
 
   return (
@@ -6290,8 +6349,11 @@ function AdminActionCenterTab({ onSwitchTab }) {
 
 function AdminVerificationTab() {
   const adminToken = sessionStorage.getItem('pl_admin_token')
+  const showToast = useToast()
   const [customers, setCustomers] = useState([])
   const [filter, setFilter] = useState('unverified')
+  const [search, setSearch] = useState('')
+  const [busyId, setBusyId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
 
@@ -6308,11 +6370,30 @@ function AdminVerificationTab() {
 
   useEffect(() => { loadCustomers() }, [loadCustomers])
 
+  const setVerified = async (customer, verified) => {
+    const label = verified ? 'mark this customer peptide eligible' : 'remove peptide eligibility for this customer'
+    if (!confirm(`Are you sure you want to ${label}?\n\n${customer.name} · ${customer.email}`)) return
+    setBusyId(customer.id)
+    try {
+      const res = await fetch('/api/admin/verify-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ id: customer.id, verified }),
+      })
+      const d = await res.json()
+      if (!res.ok) { showToast(d.error || 'Could not update verification', 'error'); return }
+      showToast(verified ? 'Customer marked peptide eligible' : 'Customer verification removed')
+      loadCustomers()
+    } catch { showToast('Network error updating verification', 'error') }
+    finally { setBusyId(null) }
+  }
+
+  const q = search.trim().toLowerCase()
   const shown = customers.filter(c => {
     if (filter === 'verified') return c.phone_verified === 1
     if (filter === 'unverified') return c.phone && c.phone_verified !== 1
     return true
-  })
+  }).filter(c => !q || c.name?.toLowerCase().includes(q) || c.username?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.toLowerCase().includes(q))
 
   return (
     <div className="space-y-4">
@@ -6328,6 +6409,8 @@ function AdminVerificationTab() {
           <button key={id} onClick={() => setFilter(id)} className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${filter === id ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>{label}</button>
         ))}
       </div>
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers by name, username, email, or phone…"
+        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 text-sm" />
       {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
       {loading ? <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">
@@ -6340,6 +6423,149 @@ function AdminVerificationTab() {
               <span className={`text-xs font-black px-2 py-1 rounded-full border ${c.phone_verified === 1 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
                 {c.phone_verified === 1 ? 'Peptide Eligible' : 'Needs Verification'}
               </span>
+              {c.phone && (
+                <button onClick={() => setVerified(c, c.phone_verified !== 1)} disabled={busyId === c.id}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 ${c.phone_verified === 1 ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                  {busyId === c.id ? 'Saving…' : c.phone_verified === 1 ? 'Remove' : 'Verify'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AdminWaitlistsTab() {
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const showToast = useToast()
+  const [signups, setSignups] = useState([])
+  const [summary, setSummary] = useState([])
+  const [department, setDepartment] = useState('all')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [notice, setNotice] = useState({
+    department: 'Apparel & Gear',
+    subject: 'New Pryme Labs products are launching soon',
+    message: 'Thanks for joining the release list. New products are being added soon — come back and visit as the department opens up.',
+    test_email: '',
+  })
+
+  const loadWaitlists = useCallback(async () => {
+    setLoading(true); setErr('')
+    try {
+      const params = new URLSearchParams()
+      if (department !== 'all') params.set('department', department)
+      if (search.trim()) params.set('q', search.trim())
+      const res = await fetch(`/api/admin/department-waitlist?${params.toString()}`, { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not load waitlists'); return }
+      setSignups(d.signups || [])
+      setSummary(d.summary || [])
+    } catch { setErr('Network error loading waitlists') }
+    finally { setLoading(false) }
+  }, [adminToken, department, search])
+
+  useEffect(() => { loadWaitlists() }, [loadWaitlists])
+
+  const act = async (body, success) => {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin/department-waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify(body),
+      })
+      const d = await res.json()
+      if (!res.ok) { showToast(d.error || 'Action failed', 'error'); return null }
+      showToast(success(d))
+      loadWaitlists()
+      return d
+    } catch { showToast('Network error', 'error'); return null }
+    finally { setBusy(false) }
+  }
+
+  const sendLaunch = (test = false) => {
+    if (!test && !confirm(`Send this launch notice to all unnotified ${notice.department} waitlist signups?`)) return
+    act({
+      action: 'send-launch',
+      department: notice.department,
+      subject: notice.subject,
+      message: notice.message,
+      test_email: test ? notice.test_email : '',
+    }, d => test ? `Test sent to ${notice.test_email}` : `Launch notice sent to ${d.sent || 0} of ${d.total || 0}`)
+  }
+
+  return (
+    <div className="space-y-5 max-w-6xl">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-white font-black text-xl">Department Waitlists</h2>
+          <p className="text-zinc-500 text-sm">People who asked to be notified when non-peptide departments launch.</p>
+        </div>
+        <button onClick={loadWaitlists} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Refresh</button>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-3">
+        {summary.length === 0 ? (
+          <div className="sm:col-span-3 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-zinc-500 text-sm">No waitlist signups yet.</div>
+        ) : summary.map(s => (
+          <button key={s.department} onClick={() => setDepartment(s.department)}
+            className="bg-zinc-900 border border-zinc-800 hover:border-blue-600/40 rounded-2xl p-4 text-left transition-colors">
+            <div className="text-white font-black">{s.department}</div>
+            <div className="text-zinc-500 text-sm mt-1">{s.total} total · {s.unnotified || 0} not notified</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-3">
+        <h3 className="text-white font-black">Send Launch Notice</h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <select value={notice.department} onChange={e => setNotice(p => ({ ...p, department: e.target.value }))} className={inp + ' w-full'}>
+            {DEPARTMENTS.filter(d => d !== 'Peptides').map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <input value={notice.subject} onChange={e => setNotice(p => ({ ...p, subject: e.target.value }))} placeholder="Email subject" className={inp + ' w-full'} />
+          <textarea value={notice.message} onChange={e => setNotice(p => ({ ...p, message: e.target.value }))} rows={4} placeholder="Launch message" className={inp + ' w-full md:col-span-2 resize-none'} />
+          <input value={notice.test_email} onChange={e => setNotice(p => ({ ...p, test_email: e.target.value }))} placeholder="Test email before sending" className={inp + ' w-full'} />
+          <div className="flex gap-2">
+            <button onClick={() => sendLaunch(true)} disabled={busy || !notice.test_email || !notice.subject || !notice.message}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-bold">Send Test</button>
+            <button onClick={() => sendLaunch(false)} disabled={busy || !notice.subject || !notice.message}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold">Send to List</button>
+          </div>
+        </div>
+        <p className="text-zinc-600 text-xs">Sending to the list marks unnotified signups in that department as notified. Test sends do not mark anyone.</p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <select value={department} onChange={e => setDepartment(e.target.value)} className={inp + ' sm:w-64'}>
+          <option value="all">All departments</option>
+          {DEPARTMENTS.filter(d => d !== 'Peptides').map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search email or department…" className={inp + ' flex-1'} />
+      </div>
+
+      {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
+      {loading ? <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">
+          {signups.length === 0 ? <div className="p-6 text-zinc-500 text-sm">No signups match this view.</div> : signups.map(s => (
+            <div key={s.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-bold truncate">{s.email}</div>
+                <div className="text-zinc-500 text-xs">{s.department} · Joined {formatDate(s.created_at)}</div>
+              </div>
+              <span className={`text-xs font-black px-2 py-1 rounded-full border ${s.notified_at ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
+                {s.notified_at ? 'Notified' : 'Waiting'}
+              </span>
+              {!s.notified_at && (
+                <button onClick={() => act({ action: 'mark-notified', id: s.id }, () => 'Marked notified')} disabled={busy}
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-50">Mark Notified</button>
+              )}
+              <button onClick={() => confirm(`Delete ${s.email} from ${s.department} waitlist?`) && act({ action: 'delete', id: s.id }, () => 'Signup deleted')} disabled={busy}
+                className="text-xs font-bold px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-300 disabled:opacity-50">Delete</button>
             </div>
           ))}
         </div>
@@ -6866,6 +7092,7 @@ export default function AdminPage() {
       { id: 'trash', permission: 'trash' },
       { id: 'admin-users', permission: 'admin_users' },
       { id: 'verification', permission: 'admin_users' },
+      { id: 'waitlists', permission: 'admin_users' },
       { id: 'audit', permission: 'admin_users' },
       { id: 'health', permission: 'admin_users' },
       { id: 'exports', permission: 'admin_users' },
@@ -7075,6 +7302,7 @@ export default function AdminPage() {
     { id: 'trash',       label: 'Trash',           short: '🗑️', permission: 'trash' },
     { id: 'admin-users', label: 'Admin Users',     short: '👮', permission: 'admin_users' },
     { id: 'verification', label: 'Verification',   short: '✅', permission: 'admin_users' },
+    { id: 'waitlists',   label: 'Waitlists',       short: '📬', permission: 'admin_users' },
     { id: 'audit',       label: 'Audit Log',       short: '🧾', permission: 'admin_users' },
     { id: 'health',      label: 'System Health',   short: '🛡️', permission: 'admin_users' },
     { id: 'exports',     label: 'Exports',         short: '⬇️', permission: 'admin_users' },
@@ -7174,6 +7402,7 @@ export default function AdminPage() {
         {tab === 'trash' && adminCan(adminMe, 'trash') && <TrashTab />}
         {tab === 'admin-users' && adminCan(adminMe, 'admin_users') && <AdminUsersTab />}
         {tab === 'verification' && adminCan(adminMe, 'admin_users') && <AdminVerificationTab />}
+        {tab === 'waitlists' && adminCan(adminMe, 'admin_users') && <AdminWaitlistsTab />}
         {tab === 'audit' && adminCan(adminMe, 'admin_users') && <AdminAuditTab />}
         {tab === 'health' && adminCan(adminMe, 'admin_users') && <AdminSystemHealthTab />}
         {tab === 'exports' && adminCan(adminMe, 'admin_users') && <AdminExportsTab />}

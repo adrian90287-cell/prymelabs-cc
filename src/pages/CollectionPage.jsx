@@ -7,6 +7,7 @@ import { ProductGrid } from '../components/ProductGrid'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import PhoneVerificationPrompt from '../components/PhoneVerificationPrompt'
 import DepartmentNotifyBox from '../components/DepartmentNotifyBox'
+import StorefrontTrustBar from '../components/StorefrontTrustBar'
 import { useT } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { authHeaders } from '../lib/authHeaders'
@@ -179,6 +180,8 @@ export default function CollectionPage() {
             </p>
           </div>
         )}
+
+        {department !== 'Peptides' && <StorefrontTrustBar compact />}
 
         {/* Search within this department/collection */}
         <div className="relative mb-6">

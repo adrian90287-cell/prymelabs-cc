@@ -10,6 +10,7 @@ import { useProductCatalog } from '../hooks/useProductCatalog'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import PhoneVerificationPrompt from '../components/PhoneVerificationPrompt'
 import DepartmentNotifyBox from '../components/DepartmentNotifyBox'
+import StorefrontTrustBar from '../components/StorefrontTrustBar'
 import {
   ProductModal, ProductGroupCard, groupByName,
   CATEGORY_ORDER, DEPARTMENTS, DEPARTMENT_META, departmentOf,
@@ -234,6 +235,7 @@ export default function ShopPage() {
           <h1 className="text-3xl font-black text-white">{t.shop.title}</h1>
           <p className="text-zinc-500 mt-1">{t.shop.subtitle}</p>
         </div>
+        <StorefrontTrustBar />
 
         {/* Department tabs (top-level) */}
         {!loading && (
