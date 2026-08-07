@@ -2,6 +2,7 @@ import { corsHeaders, json } from '../../_utils/cors.js'
 import { sendEmail, backInStockHtml, backInStockHtmlEs } from '../../_utils/email.js'
 import { verifyAdminToken } from '../../_utils/adminAuth.js'
 import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js'
+import { ensureProductLaunchColumns, releaseAtFromInput } from '../../_utils/productLaunch.js'
 
 // Top-level storefront departments (home-page tabs). Everything defaults to
 // 'Peptides' — see migrate_v22.sql.
@@ -77,6 +78,7 @@ export async function onRequestGet({ request, env }) {
 
   const authResult = await verifyAdminToken(request, env)
   if (!authResult.valid) return json({ error: authResult.error }, 401)
+  await ensureProductLaunchColumns(env)
   const { results } = await env.DB.prepare(
     'SELECT * FROM products ORDER BY display_order ASC, name ASC'
   ).all()
@@ -90,10 +92,11 @@ export async function onRequestPost({ request, env }) {
 
   const authResult = await verifyAdminToken(request, env)
   if (!authResult.valid) return json({ error: authResult.error }, 401)
+  await ensureProductLaunchColumns(env)
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
 
-  const { code, name, size, tagline, description, image_url, photos, category, department, collections, display_order, stock_qty, low_stock_threshold, compare_at_price, batch_number, weight_oz } = body
+  const { code, name, size, tagline, description, image_url, photos, category, department, collections, display_order, stock_qty, low_stock_threshold, compare_at_price, batch_number, weight_oz, is_draft, release_at } = body
   if (!name || !body.price) return json({ error: 'name and price are required' }, 400)
 
   const qty = Number(stock_qty) || 0
@@ -104,6 +107,7 @@ export async function onRequestPost({ request, env }) {
   const cols = normalizeCollections(collections)
   const photosJson = normalizePhotos(photos, image_url)
   const primaryImage = (JSON.parse(photosJson)[0]) || image_url || null
+  const releaseAt = releaseAtFromInput(release_at)
 
   // Auto-translate description to Spanish (best-effort, doesn't block save)
   const description_es = description ? await translateToSpanish(env, description) : null
@@ -111,15 +115,16 @@ export async function onRequestPost({ request, env }) {
   await env.DB.prepare(
     `INSERT INTO products
        (code, name, size, tagline, description, description_es, compare_at_price,
-        image_url, photos_json, category, department, collections, in_stock, display_order, stock_qty, low_stock_threshold, price, batch_number, weight_oz)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        image_url, photos_json, category, department, collections, in_stock, display_order, stock_qty, low_stock_threshold, price, batch_number, weight_oz, is_draft, release_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     slug, name, size || null, tagline || null,
     description || null, description_es,
     cap, primaryImage, photosJson,
     category || 'Research Supplies', dept, cols, auto_in_stock,
     display_order || 999, qty, Number(low_stock_threshold) ?? 5,
-    Number(body.price), batch_number?.trim() || null, Number(weight_oz) || 0
+    Number(body.price), batch_number?.trim() || null, Number(weight_oz) || 0,
+    is_draft ? 1 : 0, releaseAt
   ).run()
 
   return json({ ok: true })
@@ -132,10 +137,11 @@ export async function onRequestPut({ request, env, waitUntil }) {
 
   const authResult = await verifyAdminToken(request, env)
   if (!authResult.valid) return json({ error: authResult.error }, 401)
+  await ensureProductLaunchColumns(env)
   let body
   try { body = await request.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
 
-  const { id, code, name, size, tagline, description, image_url, photos, category, department, collections, display_order, stock_qty, low_stock_threshold, compare_at_price, batch_number, weight_oz } = body
+  const { id, code, name, size, tagline, description, image_url, photos, category, department, collections, display_order, stock_qty, low_stock_threshold, compare_at_price, batch_number, weight_oz, is_draft, release_at } = body
   if (!id) return json({ error: 'id required' }, 400)
 
   const qty = Number(stock_qty) || 0
@@ -145,6 +151,7 @@ export async function onRequestPut({ request, env, waitUntil }) {
   const cols = normalizeCollections(collections)
   const photosJson = normalizePhotos(photos, image_url)
   const primaryImage = (JSON.parse(photosJson)[0]) || image_url || null
+  const releaseAt = releaseAtFromInput(release_at)
 
   // Was this product out of stock before the edit? (to detect a restock)
   const prev = await env.DB.prepare('SELECT in_stock FROM products WHERE id = ?').bind(id).first()
@@ -160,14 +167,15 @@ export async function onRequestPut({ request, env, waitUntil }) {
     `UPDATE products
      SET code=?, name=?, size=?, tagline=?, description=?, description_es=?,
          compare_at_price=?, image_url=?, photos_json=?, category=?, department=?, collections=?, in_stock=?,
-         display_order=?, stock_qty=?, low_stock_threshold=?, price=?, batch_number=?, weight_oz=?
+         display_order=?, stock_qty=?, low_stock_threshold=?, price=?, batch_number=?, weight_oz=?, is_draft=?, release_at=?
      WHERE id=?`
   ).bind(
     code, name, size || null, tagline || null,
     description || null, description_es ?? null,
     cap, primaryImage, photosJson, category, dept, cols, auto_in_stock,
     display_order || 999, qty, Number(low_stock_threshold) ?? 5,
-    Number(body.price), batch_number?.trim() || null, Number(weight_oz) || 0, id
+    Number(body.price), batch_number?.trim() || null, Number(weight_oz) || 0,
+    is_draft ? 1 : 0, releaseAt, id
   ).run()
 
   // Restocked: out of stock → in stock. Notify the waitlist in the background.

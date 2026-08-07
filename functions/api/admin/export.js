@@ -1,6 +1,8 @@
 import { corsHeaders, json } from '../../_utils/cors.js'
 import { verifyAdminToken } from '../../_utils/adminAuth.js'
 import { checkAdminRateLimit, adminRateLimitKey } from '../../_utils/adminRateLimit.js'
+import { ensureDepartmentWaitlistTable } from '../../_utils/departmentWaitlist.js'
+import { ensureProductLaunchColumns } from '../../_utils/productLaunch.js'
 
 function csvCell(value) {
   const s = value == null ? '' : String(value)
@@ -70,8 +72,9 @@ export async function onRequestGet({ request, env }) {
   }
 
   if (type === 'products') {
+    await ensureProductLaunchColumns(env)
     const { results } = await env.DB.prepare(`
-      SELECT id, code, name, size, department, category, price, compare_at_price, stock_qty, in_stock, batch_number, display_order
+      SELECT id, code, name, size, department, category, price, compare_at_price, stock_qty, in_stock, batch_number, is_draft, release_at, display_order
       FROM products
       ORDER BY display_order ASC, name ASC
       LIMIT 10000
@@ -82,8 +85,24 @@ export async function onRequestGet({ request, env }) {
       { key: 'department', label: 'Department' }, { key: 'category', label: 'Category' },
       { key: 'price', label: 'Price' }, { key: 'compare_at_price', label: 'Compare At' },
       { key: 'stock_qty', label: 'Stock Qty' }, { key: 'in_stock', label: 'In Stock' },
-      { key: 'batch_number', label: 'Batch' }, { key: 'display_order', label: 'Display Order' },
+      { key: 'batch_number', label: 'Batch' }, { key: 'is_draft', label: 'Draft' },
+      { key: 'release_at', label: 'Release At' }, { key: 'display_order', label: 'Display Order' },
     ]), `pryme-products-${today}.csv`)
+  }
+
+  if (type === 'department-waitlist') {
+    await ensureDepartmentWaitlistTable(env)
+    const { results } = await env.DB.prepare(`
+      SELECT id, department, email, created_at, notified_at
+      FROM department_waitlist
+      ORDER BY created_at DESC, id DESC
+      LIMIT 10000
+    `).all()
+    return download(csv(results || [], [
+      { key: 'id', label: 'ID' }, { key: 'department', label: 'Department' },
+      { key: 'email', label: 'Email' }, { key: 'created_at', label: 'Created' },
+      { key: 'notified_at', label: 'Notified' },
+    ]), `pryme-department-waitlist-${today}.csv`)
   }
 
   if (type === 'audit') {

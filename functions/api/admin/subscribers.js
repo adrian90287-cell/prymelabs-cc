@@ -12,6 +12,7 @@ export async function onRequestGet({ request, env }) {
       u.username,
       u.email,
       u.phone,
+      u.phone_verified,
       u.lang,
       u.created_at,
       u.email_unsubscribed,

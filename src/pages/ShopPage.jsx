@@ -9,6 +9,7 @@ import { authHeaders } from '../lib/authHeaders'
 import { useProductCatalog } from '../hooks/useProductCatalog'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import PhoneVerificationPrompt from '../components/PhoneVerificationPrompt'
+import DepartmentNotifyBox from '../components/DepartmentNotifyBox'
 import {
   ProductModal, ProductGroupCard, groupByName,
   CATEGORY_ORDER, DEPARTMENTS, DEPARTMENT_META, departmentOf,
@@ -316,6 +317,7 @@ export default function ShopPage() {
           <div className="text-center py-24">
             <p className="text-zinc-400 text-lg font-semibold">{search.trim() ? t.shop.noResults : showComingSoon ? t.home.emptyDept(departmentName) : t.shop.noProducts}</p>
             {!search.trim() && <p className="text-zinc-600 text-sm mt-1">{showComingSoon ? t.home.emptyDeptHint : t.shop.checkBack}</p>}
+            {showComingSoon && <DepartmentNotifyBox department={department} />}
           </div>
         )}
 

@@ -2,8 +2,10 @@ import { corsHeaders, json } from '../../_utils/cors.js';
 import { isContentAuthed } from '../../_utils/contentAuth.js';
 import { resolveSaleConfig } from '../../_utils/sale.js';
 import { computeDisplayPricing } from '../../_utils/pricing.js';
+import { ensureProductLaunchColumns, isReleasedProduct } from '../../_utils/productLaunch.js';
 
 export async function onRequestGet({ request, env }) {
+  await ensureProductLaunchColumns(env);
   // Public visitors may browse the general storefront. The Peptides department
   // remains restricted: only logged-in customers or admin preview may read it.
   const authed = await isContentAuthed(request, env);
@@ -12,6 +14,7 @@ export async function onRequestGet({ request, env }) {
     env.DB.prepare(
       `SELECT id, code, name, size, tagline, description, description_es,
               price, compare_at_price, image_url, photos_json, category, department, collections, in_stock, stock_qty,
+              is_draft, release_at,
               bundle_of_product_id, bundle_qty, no_discount
        FROM products
        ORDER BY display_order ASC, id ASC`
@@ -44,9 +47,10 @@ export async function onRequestGet({ request, env }) {
   // Look up table so a case can read its parent single's stock
   const byId = new Map((products || []).map(p => [p.id, p]));
 
+  const released = (products || []).filter(p => isReleasedProduct(p));
   const visibleProducts = authed
-    ? (products || [])
-    : (products || []).filter(p => (p.department || 'Peptides') !== 'Peptides');
+    ? released
+    : released.filter(p => (p.department || 'Peptides') !== 'Peptides');
 
   const finalProducts = visibleProducts.map(p => {
     const isBundle = p.bundle_of_product_id != null;

@@ -6,6 +6,7 @@ import Footer from '../components/Footer'
 import { ProductGrid } from '../components/ProductGrid'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
 import PhoneVerificationPrompt from '../components/PhoneVerificationPrompt'
+import DepartmentNotifyBox from '../components/DepartmentNotifyBox'
 import { useT } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { authHeaders } from '../lib/authHeaders'
@@ -225,13 +226,16 @@ export default function CollectionPage() {
         {loading ? (
           <div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
         ) : (
-          <ProductGrid
-            products={shown}
-            coaDocs={coaDocs}
-            showWasPrice={showWasPrice}
-            emptyLabel={search.trim() ? t.shop.noResults : showComingSoon ? t.home.emptyDept(deptName) : t.collections.empty}
-            emptyHint={showComingSoon ? t.home.emptyDeptHint : undefined}
-          />
+          <>
+            <ProductGrid
+              products={shown}
+              coaDocs={coaDocs}
+              showWasPrice={showWasPrice}
+              emptyLabel={search.trim() ? t.shop.noResults : showComingSoon ? t.home.emptyDept(deptName) : t.collections.empty}
+              emptyHint={showComingSoon ? t.home.emptyDeptHint : undefined}
+            />
+            {shown.length === 0 && showComingSoon && <DepartmentNotifyBox department={department} />}
+          </>
         )}
       </main>
 

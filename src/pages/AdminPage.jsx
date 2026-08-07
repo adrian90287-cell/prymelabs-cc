@@ -1588,7 +1588,7 @@ function OrdersTab({ data, loading, onRefresh, onSwitchTab }) {
 
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
 
-const EMPTY_PRODUCT = { code: '', name: '', size: '', tagline: '', description: '', description_es: '', price: '', compare_at_price: '', image_url: '', photos: [], category: 'Research Supplies', department: 'Peptides', collections: [], display_order: '', stock_qty: '', low_stock_threshold: '5', batch_number: '', weight_oz: '' }
+const EMPTY_PRODUCT = { code: '', name: '', size: '', tagline: '', description: '', description_es: '', price: '', compare_at_price: '', image_url: '', photos: [], category: 'Research Supplies', department: 'Peptides', collections: [], display_order: '', stock_qty: '', low_stock_threshold: '5', batch_number: '', weight_oz: '', is_draft: false, release_at: '' }
 const MAX_PHOTOS = 10
 
 // Parse a product's photos into an array (photos array, photos_json string, or a
@@ -1599,9 +1599,25 @@ function parsePhotos(p) {
   return p?.image_url ? [p.image_url] : []
 }
 
+function datetimeLocalFromEpoch(value) {
+  const n = Number(value || 0)
+  if (!n) return ''
+  const d = new Date(n * 1000)
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+function epochFromDatetimeLocal(value) {
+  if (!value) return null
+  const ms = new Date(value).getTime()
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null
+}
+
 function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
   const [form, setForm] = useState(() => {
-    const base = initial ? { ...initial, photos: parsePhotos(initial) } : { ...EMPTY_PRODUCT }
+    const base = initial
+      ? { ...initial, photos: parsePhotos(initial), is_draft: initial.is_draft === 1 || initial.is_draft === true, release_at: datetimeLocalFromEpoch(initial.release_at) }
+      : { ...EMPTY_PRODUCT }
     // New product (no id): pre-fill the next display order from the inventory,
     // even when a department was pre-selected from the tab.
     if (!initial?.id) {
@@ -1681,7 +1697,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
       const res = await fetch('/api/admin/products', {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
-        body: JSON.stringify({ ...form, price: Number(form.price) }),
+        body: JSON.stringify({ ...form, price: Number(form.price), release_at: epochFromDatetimeLocal(form.release_at) }),
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Save failed'); return }
@@ -1719,6 +1735,17 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
         <div>
           <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Price * ($)</label>
           <input type="number" step="0.01" placeholder="49.99" value={form.price} onChange={set('price')} className={inp + ' w-full'} />
+        </div>
+        <div className="sm:col-span-2 bg-blue-500/8 border border-blue-500/20 rounded-2xl p-4 grid sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-3 text-zinc-300 text-sm font-semibold">
+            <input type="checkbox" checked={!!form.is_draft} onChange={set('is_draft')} className="w-4 h-4 accent-blue-600" />
+            Save as draft / hide from storefront
+          </label>
+          <div>
+            <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Release Date Optional</label>
+            <input type="datetime-local" value={form.release_at || ''} onChange={set('release_at')} className={inp + ' w-full'} />
+          </div>
+          <p className="sm:col-span-2 text-zinc-500 text-xs">Drafts are always hidden. Scheduled products appear automatically once the release date passes.</p>
         </div>
         <div>
           <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Was Price ($)</label>
@@ -2668,6 +2695,8 @@ function InventoryTab() {
                             {p.batch_number}
                           </span>
                         )}
+                        {p.is_draft === 1 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 font-bold">Draft</span>}
+                        {p.release_at && Number(p.release_at) > Math.floor(Date.now() / 1000) && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 font-bold">Scheduled</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-zinc-400 hidden md:table-cell">{p.category}</td>
@@ -6176,6 +6205,149 @@ function AdminUsersTab() {
   )
 }
 
+function AdminActionCenterTab({ onSwitchTab }) {
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const loadCenter = useCallback(async () => {
+    setLoading(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/action-center', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not load action center'); return }
+      setData(d)
+    } catch { setErr('Network error loading action center') }
+    finally { setLoading(false) }
+  }, [adminToken])
+
+  useEffect(() => { loadCenter() }, [loadCenter])
+
+  const cards = [
+    { label: 'Unpaid Orders', value: data?.cards?.unpaid_orders || 0, tab: 'orders', color: 'text-amber-300' },
+    { label: 'Low Stock', value: data?.cards?.low_stock || 0, tab: 'inventory', color: 'text-red-300' },
+    { label: 'Unverified Customers', value: data?.cards?.unverified_customers || 0, tab: 'verification', color: 'text-blue-300' },
+    { label: 'New Subscribers', value: data?.cards?.new_subscribers_7d || 0, tab: 'subscribers', color: 'text-green-300' },
+    { label: 'Waitlist Signups', value: data?.cards?.department_waitlist || 0, tab: 'exports', color: 'text-purple-300' },
+    { label: 'Audit Events', value: data?.cards?.audit_events_7d || 0, tab: 'audit', color: 'text-zinc-300' },
+  ]
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-white font-black text-xl">Action Center</h2>
+          <p className="text-zinc-500 text-sm">The things most likely to need your attention today.</p>
+        </div>
+        <button onClick={loadCenter} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Refresh</button>
+      </div>
+      {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
+      {loading && <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}
+      {data && (
+        <>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {cards.map(c => (
+              <button key={c.label} onClick={() => onSwitchTab?.(c.tab)} className="bg-zinc-900 border border-zinc-800 hover:border-blue-600/40 rounded-3xl p-5 text-left transition-colors">
+                <div className={`text-3xl font-black ${c.color}`}>{c.value}</div>
+                <div className="text-white font-bold mt-1">{c.label}</div>
+              </button>
+            ))}
+          </div>
+          <div className="grid lg:grid-cols-2 gap-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+              <h3 className="text-white font-bold mb-3">Oldest unpaid orders</h3>
+              {(data.unpaid_orders || []).length === 0 ? <p className="text-zinc-600 text-sm">No unpaid orders need attention.</p> : (
+                <div className="space-y-2">
+                  {data.unpaid_orders.map(o => (
+                    <div key={o.id} className="flex justify-between gap-3 text-sm border-b border-zinc-800/60 pb-2">
+                      <div><div className="text-white font-bold">{o.order_number}</div><div className="text-zinc-500">{o.customer_name}</div></div>
+                      <div className="text-amber-300 font-bold">${Number(o.order_total || 0).toFixed(2)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+              <h3 className="text-white font-bold mb-3">Low stock products</h3>
+              {(data.low_stock_products || []).length === 0 ? <p className="text-zinc-600 text-sm">Inventory levels look good.</p> : (
+                <div className="space-y-2">
+                  {data.low_stock_products.map(p => (
+                    <div key={p.id} className="flex justify-between gap-3 text-sm border-b border-zinc-800/60 pb-2">
+                      <div className="text-white font-bold">{p.name}</div>
+                      <div className="text-red-300 font-bold">{p.stock_qty} left</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function AdminVerificationTab() {
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const [customers, setCustomers] = useState([])
+  const [filter, setFilter] = useState('unverified')
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const loadCustomers = useCallback(async () => {
+    setLoading(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/subscribers', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not load customers'); return }
+      setCustomers(d.subscribers || [])
+    } catch { setErr('Network error loading customers') }
+    finally { setLoading(false) }
+  }, [adminToken])
+
+  useEffect(() => { loadCustomers() }, [loadCustomers])
+
+  const shown = customers.filter(c => {
+    if (filter === 'verified') return c.phone_verified === 1
+    if (filter === 'unverified') return c.phone && c.phone_verified !== 1
+    return true
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-white font-bold text-lg">Customer Verification</h2>
+          <p className="text-zinc-500 text-sm">Phone verification controls peptide department access.</p>
+        </div>
+        <button onClick={loadCustomers} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Refresh</button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {[['unverified','Needs verification'], ['verified','Verified'], ['all','All customers']].map(([id, label]) => (
+          <button key={id} onClick={() => setFilter(id)} className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${filter === id ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>{label}</button>
+        ))}
+      </div>
+      {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
+      {loading ? <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">
+          {shown.length === 0 ? <div className="p-6 text-zinc-500 text-sm">No customers in this view.</div> : shown.map(c => (
+            <div key={c.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex-1">
+                <div className="text-white font-bold">{c.name}</div>
+                <div className="text-zinc-500 text-xs">@{c.username} · {c.email} · {c.phone || 'no phone'}</div>
+              </div>
+              <span className={`text-xs font-black px-2 py-1 rounded-full border ${c.phone_verified === 1 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
+                {c.phone_verified === 1 ? 'Peptide Eligible' : 'Needs Verification'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AdminAccountTab({ adminMe, onProfileUpdated, onPasswordChanged }) {
   const showToast = useToast()
   const adminToken = sessionStorage.getItem('pl_admin_token')
@@ -6418,7 +6590,8 @@ function AdminExportsTab() {
   const cards = [
     { type: 'orders', title: 'Orders Export', desc: 'Order numbers, customer info, status, totals, and timestamps.', icon: '📦' },
     { type: 'subscribers', title: 'Customers Export', desc: 'Customer accounts, email/phone, language, and opt-out flags.', icon: '👥' },
-    { type: 'products', title: 'Products Export', desc: 'Product catalog, department, category, price, stock, and batch.', icon: '🏬' },
+    { type: 'products', title: 'Products Export', desc: 'Product catalog, launch status, department, price, stock, and batch.', icon: '🏬' },
+    { type: 'department-waitlist', title: 'Department Waitlist Export', desc: 'Notify-me signups for departments that are launching soon.', icon: '📬' },
     { type: 'audit', title: 'Audit Log Export', desc: 'Admin security activity and sensitive action records.', icon: '🧾' },
   ]
 
@@ -6674,6 +6847,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authed || !adminMe) return
     const visible = [
+      { id: 'action', permission: 'admin_users' },
       { id: 'orders', permission: 'orders' },
       { id: 'willcall', permission: 'willcall' },
       { id: 'completed', permission: 'orders' },
@@ -6691,6 +6865,7 @@ export default function AdminPage() {
       { id: 'suggestions', permission: 'suggestions' },
       { id: 'trash', permission: 'trash' },
       { id: 'admin-users', permission: 'admin_users' },
+      { id: 'verification', permission: 'admin_users' },
       { id: 'audit', permission: 'admin_users' },
       { id: 'health', permission: 'admin_users' },
       { id: 'exports', permission: 'admin_users' },
@@ -6881,6 +7056,7 @@ export default function AdminPage() {
   }
 
   const TABS = [
+    { id: 'action',      label: 'Action Center',  short: '🎯', permission: 'admin_users' },
     { id: 'orders',      label: 'Orders',         short: '📦', permission: 'orders' },
     { id: 'willcall',    label: 'Will Call',       short: '🏷️', permission: 'willcall' },
     { id: 'completed',   label: 'Completed',      short: '✅', permission: 'orders' },
@@ -6898,6 +7074,7 @@ export default function AdminPage() {
     { id: 'suggestions', label: '💡 Suggestions',  short: '💡', permission: 'suggestions' },
     { id: 'trash',       label: 'Trash',           short: '🗑️', permission: 'trash' },
     { id: 'admin-users', label: 'Admin Users',     short: '👮', permission: 'admin_users' },
+    { id: 'verification', label: 'Verification',   short: '✅', permission: 'admin_users' },
     { id: 'audit',       label: 'Audit Log',       short: '🧾', permission: 'admin_users' },
     { id: 'health',      label: 'System Health',   short: '🛡️', permission: 'admin_users' },
     { id: 'exports',     label: 'Exports',         short: '⬇️', permission: 'admin_users' },
@@ -6978,6 +7155,7 @@ export default function AdminPage() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
+        {tab === 'action' && adminCan(adminMe, 'admin_users') && <AdminActionCenterTab onSwitchTab={setTab} />}
         {tab === 'orders' && adminCan(adminMe, 'orders') && <OrdersTab data={data} loading={loading} onRefresh={load} onSwitchTab={setTab} />}
         {tab === 'willcall' && adminCan(adminMe, 'willcall') && <WillCallTab onOrderCreated={load} />}
         {tab === 'completed' && adminCan(adminMe, 'orders') && <CompletedOrdersTab data={data} loading={loading} onRefresh={load} />}
@@ -6995,6 +7173,7 @@ export default function AdminPage() {
         {tab === 'suggestions' && adminCan(adminMe, 'suggestions') && <SuggestionsTab />}
         {tab === 'trash' && adminCan(adminMe, 'trash') && <TrashTab />}
         {tab === 'admin-users' && adminCan(adminMe, 'admin_users') && <AdminUsersTab />}
+        {tab === 'verification' && adminCan(adminMe, 'admin_users') && <AdminVerificationTab />}
         {tab === 'audit' && adminCan(adminMe, 'admin_users') && <AdminAuditTab />}
         {tab === 'health' && adminCan(adminMe, 'admin_users') && <AdminSystemHealthTab />}
         {tab === 'exports' && adminCan(adminMe, 'admin_users') && <AdminExportsTab />}
