@@ -5,6 +5,7 @@ import CartSidebar from '../components/CartSidebar'
 import Footer from '../components/Footer'
 import { ProductGrid } from '../components/ProductGrid'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
+import PhoneVerificationPrompt from '../components/PhoneVerificationPrompt'
 import { useT } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { authHeaders } from '../lib/authHeaders'
@@ -47,7 +48,8 @@ export default function CollectionPage() {
   const department = departmentFromSlug(deptSlug || '')
   const collection = department && colSlug ? collectionFromSlug(department, colSlug) : null
   const isAdmin = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('pl_admin_token')
-  const canViewPeptides = !!user || isAdmin
+  const phoneVerified = user?.phone_verified === true
+  const canViewPeptides = (!!user && phoneVerified) || isAdmin
 
   // Re-check the ack whenever we land on a Peptides route — sessionStorage can
   // have been cleared by a login/logout since this component last mounted.
@@ -69,10 +71,10 @@ export default function CollectionPage() {
 
   // Peptides stay restricted even though the rest of the storefront is public.
   useEffect(() => {
-    if (!authLoading && department === 'Peptides' && !canViewPeptides) {
+    if (!authLoading && department === 'Peptides' && !canViewPeptides && !user && !isAdmin) {
       navigate('/auth', { replace: true })
     }
-  }, [authLoading, department, canViewPeptides, navigate])
+  }, [authLoading, department, canViewPeptides, user, isAdmin, navigate])
 
   // Clear search when navigating to a different department/collection
   useEffect(() => { setSearch('') }, [deptSlug, colSlug])
@@ -95,6 +97,15 @@ export default function CollectionPage() {
   }
 
   if (department === 'Peptides' && !canViewPeptides) {
+    if (user && !phoneVerified && !isAdmin) {
+      return (
+        <div className="min-h-screen bg-zinc-950">
+          <Navbar />
+          <CartSidebar />
+          <PhoneVerificationPrompt required />
+        </div>
+      )
+    }
     return (
       <div className="min-h-screen bg-zinc-950"><Navbar /><CartSidebar />
         <div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>

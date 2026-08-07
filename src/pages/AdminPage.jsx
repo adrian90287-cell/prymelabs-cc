@@ -6323,17 +6323,22 @@ function AdminAuditTab() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+  const [filters, setFilters] = useState({ q: '', actor: '', days: '30' })
 
   const loadEvents = useCallback(async () => {
     setLoading(true); setErr('')
     try {
-      const res = await fetch('/api/admin/audit-log', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const params = new URLSearchParams()
+      if (filters.q.trim()) params.set('q', filters.q.trim())
+      if (filters.actor.trim()) params.set('actor', filters.actor.trim())
+      if (filters.days) params.set('days', filters.days)
+      const res = await fetch(`/api/admin/audit-log?${params.toString()}`, { headers: { Authorization: `Bearer ${adminToken}` } })
       const d = await res.json()
       if (!res.ok) { setErr(d.error || 'Could not load audit log'); return }
       setEvents(d.events || [])
     } catch { setErr('Network error loading audit log') }
     finally { setLoading(false) }
-  }, [adminToken])
+  }, [adminToken, filters])
 
   useEffect(() => { loadEvents() }, [loadEvents])
 
@@ -6345,6 +6350,19 @@ function AdminAuditTab() {
           <p className="text-zinc-500 text-sm">Recent sensitive admin actions: users, permissions, passwords, and 2FA.</p>
         </div>
         <button onClick={loadEvents} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Refresh</button>
+      </div>
+      <div className="grid sm:grid-cols-[1fr_180px_140px] gap-3 bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+        <input value={filters.q} onChange={e => setFilters(p => ({ ...p, q: e.target.value }))} placeholder="Search action, target, user..."
+          className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 text-sm" />
+        <input value={filters.actor} onChange={e => setFilters(p => ({ ...p, actor: e.target.value }))} placeholder="Actor"
+          className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 text-sm" />
+        <select value={filters.days} onChange={e => setFilters(p => ({ ...p, days: e.target.value }))}
+          className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 text-sm">
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="">All time</option>
+        </select>
       </div>
       {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
       {loading ? (
@@ -6366,6 +6384,70 @@ function AdminAuditTab() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function AdminExportsTab() {
+  const showToast = useToast()
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const [downloading, setDownloading] = useState('')
+
+  const downloadExport = async (type) => {
+    setDownloading(type)
+    try {
+      const res = await fetch(`/api/admin/export?type=${encodeURIComponent(type)}`, { headers: { Authorization: `Bearer ${adminToken}` } })
+      if (!res.ok) { showToast('Could not export data', 'error'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pryme-${type}-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      showToast(`${type} export downloaded`)
+    } catch {
+      showToast('Network error exporting data', 'error')
+    } finally {
+      setDownloading('')
+    }
+  }
+
+  const cards = [
+    { type: 'orders', title: 'Orders Export', desc: 'Order numbers, customer info, status, totals, and timestamps.', icon: '📦' },
+    { type: 'subscribers', title: 'Customers Export', desc: 'Customer accounts, email/phone, language, and opt-out flags.', icon: '👥' },
+    { type: 'products', title: 'Products Export', desc: 'Product catalog, department, category, price, stock, and batch.', icon: '🏬' },
+    { type: 'audit', title: 'Audit Log Export', desc: 'Admin security activity and sensitive action records.', icon: '🧾' },
+  ]
+
+  return (
+    <div className="max-w-5xl space-y-5">
+      <div>
+        <h2 className="text-white font-bold text-lg">Backups & Exports</h2>
+        <p className="text-zinc-500 text-sm">Download read-only CSV backups for key store records. Keep these files private.</p>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        {cards.map(c => (
+          <div key={c.type} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-xl">{c.icon}</div>
+              <div className="flex-1">
+                <h3 className="text-white font-black">{c.title}</h3>
+                <p className="text-zinc-500 text-sm mt-1">{c.desc}</p>
+              </div>
+            </div>
+            <button onClick={() => downloadExport(c.type)} disabled={!!downloading}
+              className="mt-4 w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold">
+              {downloading === c.type ? 'Downloading…' : 'Download CSV'}
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-amber-200 text-sm">
+        These exports may contain customer information. Store them securely and delete old copies when you no longer need them.
+      </div>
     </div>
   )
 }
@@ -6611,6 +6693,7 @@ export default function AdminPage() {
       { id: 'admin-users', permission: 'admin_users' },
       { id: 'audit', permission: 'admin_users' },
       { id: 'health', permission: 'admin_users' },
+      { id: 'exports', permission: 'admin_users' },
       { id: 'account', permission: null },
     ].filter(t => adminCan(adminMe, t.permission))
     if (!visible.some(t => t.id === tab)) setTab(visible[0]?.id || 'storefront')
@@ -6817,6 +6900,7 @@ export default function AdminPage() {
     { id: 'admin-users', label: 'Admin Users',     short: '👮', permission: 'admin_users' },
     { id: 'audit',       label: 'Audit Log',       short: '🧾', permission: 'admin_users' },
     { id: 'health',      label: 'System Health',   short: '🛡️', permission: 'admin_users' },
+    { id: 'exports',     label: 'Exports',         short: '⬇️', permission: 'admin_users' },
     { id: 'account',     label: 'My Account',      short: '🔐' },
   ].filter(t => adminCan(adminMe, t.permission))
 
@@ -6913,6 +6997,7 @@ export default function AdminPage() {
         {tab === 'admin-users' && adminCan(adminMe, 'admin_users') && <AdminUsersTab />}
         {tab === 'audit' && adminCan(adminMe, 'admin_users') && <AdminAuditTab />}
         {tab === 'health' && adminCan(adminMe, 'admin_users') && <AdminSystemHealthTab />}
+        {tab === 'exports' && adminCan(adminMe, 'admin_users') && <AdminExportsTab />}
         {tab === 'account' && <AdminAccountTab
           adminMe={adminMe}
           onProfileUpdated={(next) => setAdminMe(p => ({ ...p, ...next }))}

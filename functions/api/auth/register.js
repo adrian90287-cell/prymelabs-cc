@@ -6,15 +6,10 @@ import { sendEmail, sendSMS } from '../../_utils/email.js'
 import { pushToAll } from '../../_utils/webpush.js'
 import { uploadToOneDrive } from '../../_utils/onedrive.js'
 import { subscriberRecordHtml } from '../../_utils/documents.js'
+import { normalizePhone } from '../../_utils/phoneVerification.js'
 
 function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-}
-
-function normalizePhone(phone) {
-  const digits = String(phone || '').replace(/\D/g, '')
-  if (!digits) return null
-  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
 }
 
 export async function onRequestPost({ request, env, waitUntil }) {
@@ -77,7 +72,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   await env.DB.prepare('UPDATE users SET phone_norm = ? WHERE id = ?').bind(cleanPhone, userId).run().catch(() => {})
   await env.DB.prepare('UPDATE users SET phone_verified = 0 WHERE id = ?').bind(userId).run().catch(() => {})
   const token = await signJWT(
-    { sub: userId, username: username.trim().toLowerCase(), name: name.trim(), email: email.trim().toLowerCase(), phone: cleanPhone, lang: cleanLang, tv: 0, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
+    { sub: userId, username: username.trim().toLowerCase(), name: name.trim(), email: email.trim().toLowerCase(), phone: cleanPhone, lang: cleanLang, phone_verified: false, tv: 0, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
     env.JWT_SECRET
   )
 
@@ -128,7 +123,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   waitUntil(sendSMS(env, { message: `👤 New Subscriber: ${name.trim()} (${email.trim().toLowerCase()})${cleanPhone ? ` 📱${cleanPhone}` : ''}` }).catch(() => {}))
 
-  return json({ token, user: { id: userId, name: name.trim(), username: username.trim().toLowerCase(), email: email.trim().toLowerCase(), phone: cleanPhone, lang: cleanLang } })
+  return json({ token, user: { id: userId, name: name.trim(), username: username.trim().toLowerCase(), email: email.trim().toLowerCase(), phone: cleanPhone, lang: cleanLang, phone_verified: false } })
 }
 
 export async function onRequestOptions() {

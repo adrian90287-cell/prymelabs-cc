@@ -55,6 +55,17 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const updateSession = (tokenValue, userValue) => {
+    if (tokenValue) {
+      localStorage.setItem('pl_token', tokenValue)
+      setToken(tokenValue)
+    }
+    if (userValue) {
+      localStorage.setItem('pl_user', JSON.stringify(userValue))
+      setUser(userValue)
+    }
+  }
+
   const logout = () => {
     invalidateProductCatalog()
     localStorage.removeItem('pl_token')
@@ -65,7 +76,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, updateSession }}>
       {children}
     </AuthContext.Provider>
   )

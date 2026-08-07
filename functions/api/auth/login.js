@@ -24,7 +24,7 @@ export async function onRequestPost({ request, env }) {
   if (username.length > 64 || password.length > 256) return json({ error: 'Invalid credentials' }, 400)
 
   const user = await env.DB.prepare(
-    'SELECT id, name, username, email, phone, lang, password_hash, salt, token_version FROM users WHERE username = ?'
+    'SELECT id, name, username, email, phone, phone_verified, lang, password_hash, salt, token_version FROM users WHERE username = ?'
   ).bind(username.trim().toLowerCase()).first()
 
   if (!user) {
@@ -43,11 +43,11 @@ export async function onRequestPost({ request, env }) {
   const userLang = ['en', 'es'].includes(user.lang) ? user.lang : 'en'
 
   const token = await signJWT(
-    { sub: user.id, username: user.username, name: user.name, email: user.email || '', phone: user.phone || null, lang: userLang, tv: user.token_version || 0, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
+    { sub: user.id, username: user.username, name: user.name, email: user.email || '', phone: user.phone || null, lang: userLang, phone_verified: user.phone_verified === 1, tv: user.token_version || 0, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
     env.JWT_SECRET
   )
 
-  return json({ token, user: { id: user.id, name: user.name, username: user.username, email: user.email || '', phone: user.phone || null, lang: userLang } })
+  return json({ token, user: { id: user.id, name: user.name, username: user.username, email: user.email || '', phone: user.phone || null, lang: userLang, phone_verified: user.phone_verified === 1 } })
 }
 
 export async function onRequestOptions() {

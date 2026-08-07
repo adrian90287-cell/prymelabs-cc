@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { authHeaders } from '../lib/authHeaders'
 import { useProductCatalog } from '../hooks/useProductCatalog'
 import PeptideGate, { hasAckedPeptideGate } from '../components/PeptideGate'
+import PhoneVerificationPrompt from '../components/PhoneVerificationPrompt'
 import {
   ProductModal, ProductGroupCard, groupByName,
   CATEGORY_ORDER, DEPARTMENTS, DEPARTMENT_META, departmentOf,
@@ -125,7 +126,8 @@ export default function ShopPage() {
   const t = useT()
   const { user, loading: authLoading } = useAuth()
   const isAdmin = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('pl_admin_token')
-  const canViewPeptides = !!user || isAdmin
+  const phoneVerified = user?.phone_verified === true
+  const canViewPeptides = (!!user && phoneVerified) || isAdmin
   const error = catalogError ? t.shop.loadError : ''
 
   // Re-check whenever the department filter lands on Peptides — a login/logout
@@ -135,11 +137,11 @@ export default function ShopPage() {
   }, [department])
 
   useEffect(() => {
-    if (!authLoading && department === 'Peptides' && !canViewPeptides) {
+    if (!authLoading && department === 'Peptides' && !canViewPeptides && !user && !isAdmin) {
       selectDepartment('All')
       navigate('/auth')
     }
-  }, [authLoading, department, canViewPeptides])
+  }, [authLoading, department, canViewPeptides, user, isAdmin])
 
   useEffect(() => {
     fetch('/api/coa', { headers: authHeaders() })
@@ -153,7 +155,7 @@ export default function ShopPage() {
 
   // Selecting a department resets the sub-category and syncs the URL (?dept=)
   const selectDepartment = (dep) => {
-    if (dep === 'Peptides' && !canViewPeptides) {
+    if (dep === 'Peptides' && !canViewPeptides && !user && !isAdmin) {
       navigate('/auth')
       return
     }
@@ -213,6 +215,10 @@ export default function ShopPage() {
           coaDocs={coaDocs}
           showWasPrice={showWasPrice}
         />
+      )}
+
+      {department === 'Peptides' && user && !phoneVerified && !isAdmin && (
+        <PhoneVerificationPrompt required />
       )}
 
       {department === 'Peptides' && canViewPeptides && !peptideAcked && (

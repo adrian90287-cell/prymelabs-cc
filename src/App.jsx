@@ -6,6 +6,7 @@ import { CartProvider } from './context/CartContext'
 import AgeGate from './components/AgeGate'
 import ProtectedRoute from './components/ProtectedRoute'
 import ScrollToTop from './components/ScrollToTop'
+import PhoneVerificationPrompt from './components/PhoneVerificationPrompt'
 
 // Route-level code splitting — each page only downloads when a visitor
 // actually navigates to it, instead of every visitor downloading every
@@ -40,6 +41,7 @@ export default function App() {
           <BrowserRouter>
             <AgeGate />
             <ScrollToTop />
+            <PhoneVerificationPrompt />
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<HomePage />} />

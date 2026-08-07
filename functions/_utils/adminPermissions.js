@@ -70,6 +70,7 @@ export function inferAdminPermission(request) {
     if (path === '/api/admin/profile' || path === '/api/admin/totp' || path === '/api/admin/totp-disable') return null
     if (path === '/api/admin/audit-log') return 'admin_users'
     if (path === '/api/admin/system-health') return 'admin_users'
+    if (path === '/api/admin/export') return 'admin_users'
     if (path === '/api/admin/users') return 'admin_users'
     if (path === '/api/admin/dashboard') return 'orders'
     if (path === '/api/admin/products' || path === '/api/admin/generate-description' || path === '/api/admin/translate-all') return 'inventory'

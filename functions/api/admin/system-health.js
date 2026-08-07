@@ -1,6 +1,7 @@
 import { json, corsHeaders } from '../../_utils/cors.js'
 import { verifyAdminToken } from '../../_utils/adminAuth.js'
 import { ensureAdminUsersTable } from '../../_utils/adminPermissions.js'
+import { ensurePhoneVerificationTable } from '../../_utils/phoneVerification.js'
 
 async function getColumns(env, table) {
   try {
@@ -46,6 +47,15 @@ async function duplicatePhoneGroups(env) {
   }
 }
 
+async function tableExists(env, table) {
+  try {
+    const row = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").bind(table).first()
+    return !!row
+  } catch {
+    return false
+  }
+}
+
 function check(ok, label, detail, severity = 'ok') {
   return { ok, label, detail, severity: ok ? 'ok' : severity }
 }
@@ -55,6 +65,7 @@ export async function onRequestGet({ request, env }) {
   if (!auth.valid) return json({ error: auth.error || 'Unauthorized' }, auth.status || 401)
 
   await ensureAdminUsersTable(env)
+  await ensurePhoneVerificationTable(env)
 
   const adminCols = await getColumns(env, 'admin_users')
   const resetCols = await getColumns(env, 'admin_password_resets')
@@ -63,6 +74,7 @@ export async function onRequestGet({ request, env }) {
   const userIndexes = await getIndexes(env, 'users')
   const adminUsers = await tableCount(env, 'admin_users')
   const auditEvents = await tableCount(env, 'admin_audit_log')
+  const phoneVerificationTable = await tableExists(env, 'phone_verifications')
   const duplicatePhones = await duplicatePhoneGroups(env)
   const highRiskWithout2fa = await env.DB.prepare(`
     SELECT COUNT(*) AS count
@@ -91,6 +103,8 @@ export async function onRequestGet({ request, env }) {
       'Admin audit log table', 'Sensitive admin changes are being recorded.', 'warning'),
     check(userCols.includes('phone_norm') && userCols.includes('phone_verified'),
       'Customer phone security columns', 'Customer phone numbers can be normalized and prepared for verification.', 'warning'),
+    check(phoneVerificationTable,
+      'Phone verification table', 'SMS verification codes can be created and expired safely.', 'warning'),
     check(userIndexes.includes('idx_users_phone_norm_unique'),
       'Duplicate phone lock', 'The database blocks multiple customer accounts from sharing the same normalized phone number.', 'warning'),
     check(duplicatePhones === 0 || duplicatePhones === null,
@@ -108,6 +122,7 @@ export async function onRequestGet({ request, env }) {
     check(Boolean(env.JWT_SECRET), 'Admin token secret', 'JWT secret is configured server-side.', 'critical'),
     check(Boolean(env.BREVO_API_KEY), 'Email sender', 'Email service is configured for invites and password resets.', 'warning'),
     check(Boolean(env.OWNER_EMAIL), 'Owner alert email', 'Owner email is configured for security/admin alerts.', 'warning'),
+    check(Boolean(env.QUO_API_KEY && env.QUO_PHONE_NUMBER), 'SMS sender', 'SMS service is configured for customer phone verification.', 'warning'),
     check(Boolean(env.OWNER_PHONE), 'Owner SMS number', 'Owner phone is configured for SMS alerts.', 'info'),
   ]
 
