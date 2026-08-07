@@ -3,6 +3,12 @@ import { useAuth } from '../context/AuthContext'
 
 const DISMISS_KEY = 'pl_phone_verify_dismissed'
 
+async function readJson(res) {
+  const text = await res.text()
+  if (!text) return {}
+  try { return JSON.parse(text) } catch { return { error: text } }
+}
+
 export default function PhoneVerificationPrompt({ required = false, onVerified }) {
   const { user, token, updateSession } = useAuth()
   const [dismissed, setDismissed] = useState(() => !required && sessionStorage.getItem(DISMISS_KEY) === '1')
@@ -24,7 +30,7 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ phone }),
       })
-      const d = await res.json()
+      const d = await readJson(res)
       if (!res.ok) { setErr(d.error || 'Could not save phone number'); return }
       updateSession(d.token, d.user)
       setPhone(d.user?.phone || phone)
@@ -44,8 +50,8 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
       })
-      const d = await res.json()
-      if (!res.ok) { setErr(d.error || 'Could not send verification code'); return }
+      const d = await readJson(res)
+      if (!res.ok) { setErr(d.error || `Could not send verification code (${res.status})`); return }
       if (d.already_verified && d.token && d.user) {
         updateSession(d.token, d.user)
         onVerified?.()
@@ -69,7 +75,7 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ code }),
       })
-      const d = await res.json()
+      const d = await readJson(res)
       if (!res.ok) { setErr(d.error || 'Could not verify code'); return }
       updateSession(d.token, d.user)
       onVerified?.()

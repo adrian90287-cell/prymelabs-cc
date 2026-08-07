@@ -75,8 +75,10 @@ export async function onRequestPost({ request, env }) {
   if (!smsResult?.ok) {
     await env.DB.prepare('UPDATE phone_verifications SET used = 1 WHERE user_id = ? AND sent_at = ? AND used = 0')
       .bind(user.id, now).run().catch(() => {})
-    const status = smsResult?.skipped ? 503 : 502
-    return json({ error: smsResult?.skipped ? 'SMS verification is not configured yet' : 'SMS failed to send. Please check SMS provider settings.' }, status)
+    const status = smsResult?.status || (smsResult?.skipped ? 503 : 502)
+    return json({
+      error: smsResult?.error || 'SMS failed to send. Please check SMS provider settings.',
+    }, status)
   }
 
   return json({ ok: true, expires_minutes: 10, phone_hint: phoneNorm.slice(-4) })

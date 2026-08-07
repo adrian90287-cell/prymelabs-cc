@@ -847,28 +847,40 @@ export function passwordResetHtmlEs({ customer_name, username, reset_url, expire
 // - to: recipient phone; normalized to E.164 before sending
 //        defaults to env.OWNER_PHONE if omitted (owner alert)
 export async function sendSMS(env, { message, to } = {}) {
-  if (!env.QUO_API_KEY || !env.QUO_PHONE_NUMBER) return { skipped: true }
+  if (!env.QUO_API_KEY || !env.QUO_PHONE_NUMBER) {
+    return { skipped: true, error: 'SMS sender is not configured', status: 503 }
+  }
   const recipient = smsPhone(to || env.OWNER_PHONE)
   const content = String(message || '')
-  if (!recipient || !/^\+\d{10,15}$/.test(recipient)) return { skipped: true, error: 'Invalid SMS recipient phone number' }
-  if (!content.trim()) return { skipped: true, error: 'Missing SMS message content' }
-  if (content.length > 1600) return { error: 'SMS message exceeds provider limit' }
-  const res = await fetch('https://api.openphone.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Authorization': env.QUO_API_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: env.QUO_PHONE_NUMBER,
-      to: [recipient],
-      content,
-    }),
-  })
-  if (res.ok) return { ok: true, status: res.status }
-  const detail = await res.text()
-  console.error('SMS failed', { status: res.status, detail })
-  return { error: detail, status: res.status }
+  if (!recipient || !/^\+\d{10,15}$/.test(recipient)) {
+    return { skipped: true, error: 'Invalid SMS recipient phone number', status: 400 }
+  }
+  if (!content.trim()) {
+    return { skipped: true, error: 'Missing SMS message content', status: 400 }
+  }
+  if (content.length > 1600) return { error: 'SMS message exceeds provider limit', status: 400 }
+  try {
+    const res = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': env.QUO_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: env.QUO_PHONE_NUMBER,
+        to: [recipient],
+        content,
+      }),
+    })
+    if (res.ok) return { ok: true, status: res.status }
+    const detail = await res.text()
+    console.error('SMS failed', { status: res.status, detail })
+    return { error: detail || `SMS provider returned ${res.status}`, status: res.status }
+  } catch (err) {
+    const detail = err?.message || String(err || 'Unknown SMS network error')
+    console.error('SMS request failed', { detail })
+    return { error: `SMS request failed: ${detail}`, status: 502 }
+  }
 }
 
 export async function sendEmail(env, { to, subject, html, fromEmail, fromName }) {
