@@ -1,6 +1,7 @@
 // Unified notification system for both prymelabs.cc and prymelabs.store
 // Handles email, SMS, and web push notifications for orders
 import { isSyncAuthed } from '../../_utils/syncAuth.js';
+import { sendSMS } from '../../_utils/email.js';
 
 export async function onRequest({ request, env }) {
   if (request.method !== 'POST') {
@@ -271,26 +272,4 @@ function buildShippingNotificationEmail(orderNumber, firstName, carrier, trackin
 
 function buildDeliveredEmail(orderNumber, firstName) {
   return `<h2>Order Delivered</h2><p>Hi ${firstName},</p><p>Your order #${orderNumber} has been delivered!</p><p>Thanks for your purchase! 🙌</p>`;
-}
-
-// ============ SMS Functions ============
-
-async function sendSMS(env, { to, message }) {
-  if (!env.QUO_API_KEY || !env.QUO_PHONE_NUMBER) return;
-
-  const response = await fetch('https://api.openphone.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.QUO_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: env.QUO_PHONE_NUMBER,
-      to,
-      message
-    })
-  });
-
-  if (!response.ok) throw new Error(`SMS failed: ${response.status}`);
-  return await response.json();
 }
