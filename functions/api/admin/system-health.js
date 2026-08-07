@@ -79,7 +79,7 @@ export async function onRequestGet({ request, env }) {
 
   const owner2fa = await env.DB.prepare("SELECT value FROM settings WHERE key = 'admin_2fa_enabled'")
     .first()
-    .then(r => String(r?.value || '') === '1')
+    .then(r => r ? String(r.value || '') === '1' : false)
     .catch(() => null)
 
   const checks = [
@@ -98,7 +98,13 @@ export async function onRequestGet({ request, env }) {
     check(highRiskWithout2fa === 0 || highRiskWithout2fa === null,
       'Staff 2FA coverage', highRiskWithout2fa === null ? 'Could not check staff 2FA coverage.' : `${highRiskWithout2fa} high-access staff account(s) still need 2FA.`, 'warning'),
     check(owner2fa === true,
-      'Owner 2FA', owner2fa === null ? 'Owner 2FA setting could not be checked.' : 'Owner-level 2FA is enabled.', 'warning'),
+      'Owner 2FA',
+      owner2fa === true
+        ? 'Owner-level 2FA is enabled.'
+        : owner2fa === false
+          ? 'Owner-level 2FA is not enabled yet. Set it up from My Account.'
+          : 'Owner 2FA setting could not be checked.',
+      'warning'),
     check(Boolean(env.JWT_SECRET), 'Admin token secret', 'JWT secret is configured server-side.', 'critical'),
     check(Boolean(env.BREVO_API_KEY), 'Email sender', 'Email service is configured for invites and password resets.', 'warning'),
     check(Boolean(env.OWNER_EMAIL), 'Owner alert email', 'Owner email is configured for security/admin alerts.', 'warning'),
