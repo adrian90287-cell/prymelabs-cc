@@ -30,6 +30,19 @@ async function tokenFor(row, env) {
   }, env.JWT_SECRET)
 }
 
+function verificationEmail(user) {
+  return String(user?.email || '').trim().toLowerCase()
+}
+
+function verificationKeys(user) {
+  const keys = []
+  const email = verificationEmail(user)
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) keys.push(email)
+  const phoneNorm = user.phone_norm || normalizePhone(user.phone)
+  if (phoneNorm && !keys.includes(phoneNorm)) keys.push(phoneNorm)
+  return { keys, phoneNorm }
+}
+
 export async function onRequestPost({ request, env }) {
   const auth = request.headers.get('Authorization') || ''
   const payload = auth.startsWith('Bearer ') ? await verifyJWT(auth.slice(7), env) : null
@@ -52,7 +65,8 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: true, token, user: publicUser(user) })
   }
 
-  const phoneNorm = user.phone_norm || normalizePhone(user.phone)
+  const { keys, phoneNorm } = verificationKeys(user)
+  if (!keys.length) return json({ error: 'No valid email address on this account' }, 400)
   const now = Math.floor(Date.now() / 1000)
   const row = await env.DB.prepare(
     'SELECT id, code_hash, attempts, expires_at FROM phone_verifications WHERE user_id = ? AND used = 0 ORDER BY id DESC LIMIT 1'
@@ -60,17 +74,17 @@ export async function onRequestPost({ request, env }) {
   if (!row || Number(row.expires_at) < now) return json({ error: 'This code has expired. Please request a new one.' }, 400)
   if (Number(row.attempts || 0) >= 5) return json({ error: 'Too many wrong codes. Please request a new one.' }, 429)
 
-  const expected = await sha256Hex(`${user.id}:${phoneNorm}:${code}:${env.JWT_SECRET}`)
-  if (expected !== row.code_hash) {
+  const expectedHashes = await Promise.all(keys.map(key => sha256Hex(`${user.id}:${key}:${code}:${env.JWT_SECRET}`)))
+  if (!expectedHashes.includes(row.code_hash)) {
     await env.DB.prepare('UPDATE phone_verifications SET attempts = attempts + 1 WHERE id = ?').bind(row.id).run()
     return json({ error: 'Invalid verification code' }, 400)
   }
 
   await env.DB.batch([
-    env.DB.prepare('UPDATE users SET phone_verified = 1, phone_norm = ? WHERE id = ?').bind(phoneNorm, user.id),
+    env.DB.prepare('UPDATE users SET phone_verified = 1, phone_norm = COALESCE(?, phone_norm) WHERE id = ?').bind(phoneNorm || null, user.id),
     env.DB.prepare('UPDATE phone_verifications SET used = 1 WHERE user_id = ?').bind(user.id),
   ])
-  const updated = { ...user, phone_norm: phoneNorm, phone_verified: 1 }
+  const updated = { ...user, phone_norm: phoneNorm || user.phone_norm, phone_verified: 1 }
   const token = await tokenFor(updated, env)
   return json({ ok: true, token, user: publicUser(updated) })
 }

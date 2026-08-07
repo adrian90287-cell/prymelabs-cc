@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-const DISMISS_KEY = 'pl_phone_verify_dismissed'
+const DISMISS_KEY = 'pl_email_verify_dismissed'
 
 async function readJson(res) {
   const text = await res.text()
@@ -13,35 +13,12 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
   const { user, token, updateSession } = useAuth()
   const [dismissed, setDismissed] = useState(() => !required && sessionStorage.getItem(DISMISS_KEY) === '1')
   const [sent, setSent] = useState(false)
-  const [phone, setPhone] = useState(user?.phone || '')
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [hint, setHint] = useState('')
-  const [delivery, setDelivery] = useState('sms')
 
   if (!user || !token || user.phone_verified === true || dismissed) return null
-
-  const savePhone = async (e) => {
-    e?.preventDefault()
-    setLoading(true); setErr('')
-    try {
-      const res = await fetch('/api/auth/update-phone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ phone }),
-      })
-      const d = await readJson(res)
-      if (!res.ok) { setErr(d.error || 'Could not save phone number'); return }
-      updateSession(d.token, d.user)
-      setPhone(d.user?.phone || phone)
-      setTimeout(() => sendCode(d.token), 50)
-    } catch {
-      setErr('Network error saving phone number')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const sendCode = async (tokenOverride) => {
     const authToken = typeof tokenOverride === 'string' ? tokenOverride : token
@@ -59,8 +36,7 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
         return
       }
       setSent(true)
-      setDelivery(d.delivery || 'sms')
-      setHint(d.delivery === 'email' ? d.email_hint || '' : d.phone_hint || '')
+      setHint(d.email_hint || '')
     } catch {
       setErr('Network error sending verification code')
     } finally {
@@ -96,12 +72,12 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
   const card = (
     <div className={`${required ? 'w-full max-w-md' : 'w-full sm:max-w-sm'} bg-zinc-900 border border-blue-500/30 rounded-3xl p-5 shadow-2xl shadow-blue-950/30`}>
       <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-xl shrink-0">📱</div>
+        <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-xl shrink-0">✉️</div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-white font-black text-lg">{required ? 'Verify phone to enter Peptides' : 'Verify your phone'}</h3>
+          <h3 className="text-white font-black text-lg">{required ? 'Verify email to enter Peptides' : 'Verify your email'}</h3>
           <p className="text-zinc-500 text-sm mt-1">
             {required
-              ? 'Peptide access requires a verified customer phone number.'
+              ? 'Peptide access requires a verified customer email.'
               : 'This helps protect your account and unlocks restricted sections.'}
           </p>
         </div>
@@ -111,33 +87,22 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
       </div>
 
       <div className="mt-4 space-y-3">
-        {!user.phone ? (
-          <form onSubmit={savePhone} className="space-y-3">
-            <input value={phone} onChange={e => setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="Enter phone number"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500" />
-            <button disabled={loading || !phone.trim()}
-              className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold">
-              {loading ? 'Saving…' : 'Save Phone & Send Code'}
-            </button>
-          </form>
-        ) : !sent ? (
+        {!sent ? (
           <button onClick={sendCode} disabled={loading}
             className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold">
-            {loading ? 'Sending…' : 'Send Verification Code'}
+            {loading ? 'Sending…' : 'Send Email Code'}
           </button>
         ) : (
           <form onSubmit={verifyCode} className="space-y-3">
             <p className="text-zinc-500 text-xs">
-              {delivery === 'email'
-                ? `Enter the 6-digit code sent to ${hint || 'your account email'}.`
-                : `Enter the 6-digit code sent to the phone ending in ${hint || 'your account'}.`}
+              {`Enter the 6-digit code sent to ${hint || 'your account email'}.`}
             </p>
             <input value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="000000" inputMode="numeric" autoComplete="one-time-code"
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white text-center tracking-[0.35em] font-mono placeholder-zinc-600 focus:outline-none focus:border-blue-500" />
             <button disabled={loading || code.length !== 6}
               className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold">
-              {loading ? 'Checking…' : 'Verify Phone'}
+              {loading ? 'Checking…' : 'Verify Email'}
             </button>
             <button type="button" onClick={sendCode} disabled={loading}
               className="w-full text-zinc-500 hover:text-blue-400 text-sm">Resend code</button>

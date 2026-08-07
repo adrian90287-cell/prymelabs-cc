@@ -843,18 +843,18 @@ export function passwordResetHtmlEs({ customer_name, username, reset_url, expire
   return prymeEmailShell({ lang: 'es', rightLabel: 'RESTABLECER', preheader: `Restablece tu contraseña de Pryme Labs — el enlace caduca en ${expires_minutes} minutos.`, body })
 }
 
-export function phoneVerificationHtml({ customer_name, code, phone_hint }) {
+export function customerVerificationHtml({ customer_name, code }) {
   const first = String(customer_name || '').trim().split(/\s+/)[0]
   const greeting = first ? `Hi ${escHtml(first)},` : 'Hi,'
   const body = `
     ${slipEyebrow('VERIFICATION CODE')}
-    ${slipH1('Verify your phone')}
-    <p style="margin:0 0 24px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">${greeting} use this code to verify your Pryme Labs account${phone_hint ? ` for the phone ending in <strong style="color:#111111;">${escHtml(phone_hint)}</strong>` : ''}.</p>
+    ${slipH1('Verify your email')}
+    <p style="margin:0 0 24px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">${greeting} use this code to verify your Pryme Labs account email.</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafc;border:1px solid #d9dde5;border-radius:14px;margin:0 0 26px 0;"><tr><td align="center" style="padding:28px 24px;">
       <div style="font-size:12px;color:#9aa0aa;font-weight:700;letter-spacing:4px;margin-bottom:10px;font-family:Arial,Helvetica,sans-serif;">YOUR CODE</div>
       <div style="font-size:36px;font-weight:800;letter-spacing:10px;color:#002b63;font-family:Arial,Helvetica,sans-serif;">${escHtml(code)}</div>
     </td></tr></table>
-    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#8a8f99;font-family:Arial,Helvetica,sans-serif;">This code expires in <strong style="color:#333333;">10 minutes</strong>. We sent it by email because SMS delivery is temporarily unavailable.</p>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#8a8f99;font-family:Arial,Helvetica,sans-serif;">This code expires in <strong style="color:#333333;">10 minutes</strong>.</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fffaf0;border:1px solid #d6a72a;border-radius:14px;"><tr><td style="padding:18px 22px;font-size:14px;line-height:1.6;color:#9a7b1f;font-family:Arial,Helvetica,sans-serif;">If you did not request this code, you can safely ignore this email.</td></tr></table>`
   return prymeEmailShell({ lang: 'en', rightLabel: 'VERIFY', preheader: 'Your Pryme Labs verification code.', body })
 }
