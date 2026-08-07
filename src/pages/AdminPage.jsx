@@ -6062,6 +6062,20 @@ function AdminUsersTab() {
     } catch { showToast('Network error deleting user', 'error') }
   }
 
+  const revokeSessions = async (u) => {
+    if (!confirm(`Sign ${u.username} out everywhere? They will need to log in again.`)) return
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ id: u.id, action: 'revoke_sessions' }),
+      })
+      if (!res.ok) { showToast('Could not revoke sessions', 'error'); return }
+      showToast('Active sessions revoked')
+      loadUsers()
+    } catch { showToast('Network error revoking sessions', 'error') }
+  }
+
   return (
     <div className="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6">
       <div className="space-y-4">
@@ -6085,6 +6099,14 @@ function AdminUsersTab() {
                   </div>
                   <div className="text-zinc-500 text-xs">@{u.username}{u.email ? ` · ${u.email}` : ''}</div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-bold ${u.totp_enabled ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
+                      2FA {u.totp_enabled ? 'On' : 'Needed'}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 font-bold">
+                      Session v{u.token_version || 0}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {(u.permissions || []).length === 0 ? (
                       <span className="text-zinc-600 text-xs">No permissions</span>
                     ) : u.permissions.map(p => (
@@ -6094,8 +6116,9 @@ function AdminUsersTab() {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button onClick={() => editUser(u)} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Edit</button>
+                  <button onClick={() => revokeSessions(u)} className="px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 text-xs font-bold">Revoke Sessions</button>
                   <button onClick={() => remove(u)} className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold">Delete</button>
                 </div>
               </div>
@@ -6342,6 +6365,72 @@ function AdminAuditTab() {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+function AdminSystemHealthTab() {
+  const adminToken = sessionStorage.getItem('pl_admin_token')
+  const [health, setHealth] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const loadHealth = useCallback(async () => {
+    setLoading(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/system-health', { headers: { Authorization: `Bearer ${adminToken}` } })
+      const d = await res.json()
+      if (!res.ok) { setErr(d.error || 'Could not load system health'); return }
+      setHealth(d)
+    } catch { setErr('Network error loading system health') }
+    finally { setLoading(false) }
+  }, [adminToken])
+
+  useEffect(() => { loadHealth() }, [loadHealth])
+
+  const statusClass = (check) => {
+    if (check.ok) return 'bg-green-500/10 border-green-500/30 text-green-300'
+    if (check.severity === 'critical') return 'bg-red-500/10 border-red-500/30 text-red-300'
+    if (check.severity === 'warning') return 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+    return 'bg-zinc-800 border-zinc-700 text-zinc-300'
+  }
+
+  return (
+    <div className="max-w-5xl space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-white font-bold text-lg">System Health</h2>
+          <p className="text-zinc-500 text-sm">A quick safety check for admin security, customer account protections, and notification setup.</p>
+        </div>
+        <button onClick={loadHealth} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Refresh</button>
+      </div>
+      {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : health ? (
+        <>
+          <div className={`rounded-3xl border p-5 ${health.ok ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+            <div className="text-white font-bold">{health.ok ? 'Core security checks look good' : 'One or more critical checks need attention'}</div>
+            <div className="text-zinc-400 text-sm mt-1">
+              Critical: {health.summary?.criticalOpen || 0} · Warnings: {health.summary?.warningsOpen || 0} · Admin users: {health.summary?.adminUsers ?? '—'} · Audit events: {health.summary?.auditEvents ?? '—'}
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {(health.checks || []).map((check, idx) => (
+              <div key={`${check.label}-${idx}`} className={`rounded-2xl border p-4 ${statusClass(check)}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-black text-white">{check.label}</div>
+                  <span className="text-[10px] uppercase tracking-wider font-black">{check.ok ? 'OK' : check.severity}</span>
+                </div>
+                <div className="text-xs opacity-80 mt-1 leading-relaxed">{check.detail}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-zinc-600 text-xs">Last checked: {health.generated_at ? new Date(health.generated_at * 1000).toLocaleString() : 'just now'}</p>
+        </>
+      ) : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-zinc-500 text-sm">No health data loaded yet.</div>
       )}
     </div>
   )
@@ -6701,6 +6790,7 @@ export default function AdminPage() {
     { id: 'trash',       label: 'Trash',           short: '🗑️', permission: 'trash' },
     { id: 'admin-users', label: 'Admin Users',     short: '👮', permission: 'admin_users' },
     { id: 'audit',       label: 'Audit Log',       short: '🧾', permission: 'admin_users' },
+    { id: 'health',      label: 'System Health',   short: '🛡️', permission: 'admin_users' },
     { id: 'account',     label: 'My Account',      short: '🔐' },
   ].filter(t => adminCan(adminMe, t.permission))
 
@@ -6796,6 +6886,7 @@ export default function AdminPage() {
         {tab === 'trash' && adminCan(adminMe, 'trash') && <TrashTab />}
         {tab === 'admin-users' && adminCan(adminMe, 'admin_users') && <AdminUsersTab />}
         {tab === 'audit' && adminCan(adminMe, 'admin_users') && <AdminAuditTab />}
+        {tab === 'health' && adminCan(adminMe, 'admin_users') && <AdminSystemHealthTab />}
         {tab === 'account' && <AdminAccountTab
           adminMe={adminMe}
           onProfileUpdated={(next) => setAdminMe(p => ({ ...p, ...next }))}

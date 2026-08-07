@@ -2,6 +2,7 @@ import { corsHeaders, json } from '../../_utils/cors.js'
 import { checkRateLimit, rateLimitKey } from '../../_utils/rateLimit.js'
 import { sha256Hex, hashPassword } from '../../_utils/crypto.js'
 import { ensureAdminUsersTable } from '../../_utils/adminPermissions.js'
+import { logAdminAudit } from '../../_utils/adminAudit.js'
 
 export async function onRequestPost({ request, env }) {
   const rl = await checkRateLimit(env, rateLimitKey(request, 'admin-reset'))
@@ -35,10 +36,18 @@ export async function onRequestPost({ request, env }) {
       env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_owner_password_salt', ?)").bind(salt),
       env.DB.prepare('UPDATE admin_password_resets SET used = 1 WHERE owner = 1'),
     ])
+    await logAdminAudit(env, request, { role: 'system', username: 'password-reset' }, 'admin_password_reset.completed', {
+      target_type: 'owner',
+      target_id: 'owner',
+    })
   } else {
     await env.DB.prepare('UPDATE admin_users SET password_hash = ?, salt = ?, updated_at = ?, token_version = token_version + 1 WHERE id = ?')
       .bind(hash, salt, now, reset.admin_user_id).run()
     await env.DB.prepare('UPDATE admin_password_resets SET used = 1 WHERE admin_user_id = ?').bind(reset.admin_user_id).run()
+    await logAdminAudit(env, request, { role: 'system', username: 'password-reset' }, 'admin_password_reset.completed', {
+      target_type: 'admin_user',
+      target_id: reset.admin_user_id,
+    })
   }
   return json({ ok: true })
 }

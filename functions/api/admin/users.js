@@ -48,7 +48,7 @@ export async function onRequestGet({ request, env }) {
   await ensureAdminUsersTable(env)
 
   const { results } = await env.DB.prepare(
-    'SELECT id, name, username, email, permissions_json, is_active, created_at, updated_at, last_login_at FROM admin_users ORDER BY name ASC'
+    'SELECT id, name, username, email, permissions_json, is_active, totp_enabled, token_version, created_at, updated_at, last_login_at FROM admin_users ORDER BY name ASC'
   ).all()
 
   return json({
@@ -123,6 +123,19 @@ export async function onRequestPut({ request, env }) {
 
   const existing = await env.DB.prepare('SELECT * FROM admin_users WHERE id = ?').bind(id).first()
   if (!existing) return json({ error: 'User not found' }, 404)
+
+  if (body.action === 'revoke_sessions') {
+    const now = Math.floor(Date.now() / 1000)
+    await env.DB.prepare(
+      'UPDATE admin_users SET token_version = token_version + 1, updated_at = ? WHERE id = ?'
+    ).bind(now, id).run()
+    await logAdminAudit(env, request, gate.auth.payload, 'admin_user.sessions_revoked', {
+      target_type: 'admin_user',
+      target_id: id,
+      metadata: { username: existing.username },
+    })
+    return json({ ok: true })
+  }
 
   const err = validateUserInput({ ...body, password: body.password || '', requirePassword: false })
   if (err) return json({ error: err }, 400)

@@ -57,6 +57,11 @@ export async function onRequestPut({ request, env }) {
       stmts.push(env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_owner_password_salt', ?)").bind(salt))
     }
     await env.DB.batch(stmts)
+    await logAdminAudit(env, request, auth.payload, newPassword ? 'admin_profile.password_changed' : 'admin_profile.updated', {
+      target_type: 'owner',
+      target_id: 'owner',
+      metadata: { username, changed_password: !!newPassword },
+    })
     return json({ ok: true, admin: await ownerProfile(env) })
   }
 
@@ -76,7 +81,7 @@ export async function onRequestPut({ request, env }) {
   } catch {
     return json({ error: 'Username or email already exists' }, 409)
   }
-  await logAdminAudit(env, request, auth.payload, 'admin_profile.updated', { target_type: 'admin_user', target_id: row.id, metadata: { username, changed_password: !!newPassword } })
+  await logAdminAudit(env, request, auth.payload, newPassword ? 'admin_profile.password_changed' : 'admin_profile.updated', { target_type: 'admin_user', target_id: row.id, metadata: { username, changed_password: !!newPassword } })
   return json({ ok: true })
 }
 

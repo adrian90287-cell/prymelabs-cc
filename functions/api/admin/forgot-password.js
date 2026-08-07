@@ -3,6 +3,7 @@ import { checkRateLimit, rateLimitKey } from '../../_utils/rateLimit.js'
 import { generateToken, sha256Hex } from '../../_utils/crypto.js'
 import { sendEmail, passwordResetHtml } from '../../_utils/email.js'
 import { ensureAdminUsersTable } from '../../_utils/adminPermissions.js'
+import { logAdminAudit } from '../../_utils/adminAudit.js'
 
 const RESET_TTL_MINUTES = 30
 
@@ -40,6 +41,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
         expires_minutes: RESET_TTL_MINUTES,
       }),
     }).catch(() => {}))
+    waitUntil(logAdminAudit(env, request, { role: 'system', username: 'password-reset' }, 'admin_password_reset.requested', {
+      target_type: 'owner',
+      target_id: 'owner',
+      metadata: { username: ownerUsername },
+    }))
     return genericOk
   }
 
@@ -71,6 +77,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
       expires_minutes: RESET_TTL_MINUTES,
     }),
   }).catch(() => {}))
+  waitUntil(logAdminAudit(env, request, { role: 'system', username: 'password-reset' }, 'admin_password_reset.requested', {
+    target_type: 'admin_user',
+    target_id: user.id,
+    metadata: { username: user.username },
+  }))
 
   return genericOk
 }
