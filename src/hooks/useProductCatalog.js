@@ -27,9 +27,10 @@ function fetchCatalog() {
   return cache.promise
 }
 
-/** Invalidate the cache — call after an action that changes catalog data (e.g. cart checkout). */
-export function invalidateProductCatalog() {
+/** Invalidate the cache — call after an action that changes catalog visibility/pricing. */
+export function invalidateProductCatalog({ notify = true } = {}) {
   cache = { data: null, promise: null, fetchedAt: 0 }
+  if (notify && typeof window !== 'undefined') window.dispatchEvent(new Event('pl_catalog_invalidated'))
 }
 
 export function useProductCatalog() {
@@ -43,7 +44,7 @@ export function useProductCatalog() {
 
   useEffect(() => {
     let cancelled = false
-    fetchCatalog()
+    const load = () => fetchCatalog()
       .then(result => {
         if (cancelled) return
         setState({ products: result.products, showWasPrice: result.showWasPrice, loading: false, error: null })
@@ -53,8 +54,15 @@ export function useProductCatalog() {
         if (cancelled) return
         setState(s => ({ ...s, loading: false, error: 'load-error' }))
       })
-    return () => { cancelled = true }
-  }, [])
+    load()
+    const onInvalidated = () => {
+      if (cancelled) return
+      setState(s => ({ ...s, loading: true, error: null }))
+      load()
+    }
+    window.addEventListener('pl_catalog_invalidated', onInvalidated)
+    return () => { cancelled = true; window.removeEventListener('pl_catalog_invalidated', onInvalidated) }
+  }, [reconcilePrices])
 
   return state
 }

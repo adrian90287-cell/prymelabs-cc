@@ -1,5 +1,5 @@
 import { corsHeaders, json } from '../../_utils/cors.js';
-import { isContentAuthed } from '../../_utils/contentAuth.js';
+import { getContentAccess } from '../../_utils/contentAuth.js';
 import { resolveSaleConfig } from '../../_utils/sale.js';
 import { computeDisplayPricing } from '../../_utils/pricing.js';
 import { ensureProductLaunchColumns, isReleasedProduct } from '../../_utils/productLaunch.js';
@@ -8,7 +8,7 @@ export async function onRequestGet({ request, env }) {
   await ensureProductLaunchColumns(env);
   // Public visitors may browse the general storefront. The Peptides department
   // remains restricted: only logged-in customers or admin preview may read it.
-  const authed = await isContentAuthed(request, env);
+  const access = await getContentAccess(request, env);
 
   const [{ results: products }, { results: settingsRows }] = await Promise.all([
     env.DB.prepare(
@@ -48,7 +48,7 @@ export async function onRequestGet({ request, env }) {
   const byId = new Map((products || []).map(p => [p.id, p]));
 
   const released = (products || []).filter(p => isReleasedProduct(p));
-  const visibleProducts = authed
+  const visibleProducts = access.peptide
     ? released
     : released.filter(p => (p.department || 'Peptides') !== 'Peptides');
 
@@ -91,7 +91,7 @@ export async function onRequestGet({ request, env }) {
     };
   });
 
-  return json({ products: finalProducts, show_was_price: showWasPrice, restricted: authed ? [] : ['Peptides'] });
+  return json({ products: finalProducts, show_was_price: showWasPrice, restricted: access.peptide ? [] : ['Peptides'] });
 }
 
 export async function onRequestOptions() {

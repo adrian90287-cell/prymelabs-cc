@@ -42,12 +42,12 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = (tokenValue, userValue) => {
-    invalidateProductCatalog()
     localStorage.setItem('pl_token', tokenValue)
     localStorage.setItem('pl_user', JSON.stringify(userValue))
     sessionStorage.removeItem('pl_peptide_ack')
     setToken(tokenValue)
     setUser(userValue)
+    invalidateProductCatalog()
     // Sync language preference from server on login
     if (userValue.lang && ['en', 'es'].includes(userValue.lang)) {
       localStorage.setItem('pl_lang', userValue.lang)
@@ -64,15 +64,16 @@ export function AuthProvider({ children }) {
       localStorage.setItem('pl_user', JSON.stringify(userValue))
       setUser(userValue)
     }
+    invalidateProductCatalog()
   }
 
   const logout = () => {
-    invalidateProductCatalog()
     localStorage.removeItem('pl_token')
     localStorage.removeItem('pl_user')
     sessionStorage.removeItem('pl_peptide_ack')
     setToken(null)
     setUser(null)
+    invalidateProductCatalog()
   }
 
   return (
