@@ -4,10 +4,10 @@
 // empty object when neither is present (the request will 401, as intended).
 export function authHeaders() {
   try {
-    const token = localStorage.getItem('pl_token')
-    if (token) return { Authorization: `Bearer ${token}` }
     const adminToken = sessionStorage.getItem('pl_admin_token')
     if (adminToken) return { Authorization: `Bearer ${adminToken}` }
+    const token = localStorage.getItem('pl_token')
+    if (token) return { Authorization: `Bearer ${token}` }
   } catch { /* storage unavailable */ }
   return {}
 }
