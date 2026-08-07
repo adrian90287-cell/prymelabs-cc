@@ -6397,23 +6397,48 @@ function AdminSystemHealthTab() {
   }
 
   return (
-    <div className="max-w-5xl space-y-4">
+    <div className="max-w-6xl space-y-5">
+      <div className="rounded-[2rem] border border-blue-500/25 bg-gradient-to-br from-blue-950/50 via-zinc-950 to-emerald-950/30 p-5 sm:p-6 shadow-2xl shadow-blue-950/10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-2xl shrink-0">🛡️</div>
+            <div>
+              <div className="text-blue-300 text-xs font-black uppercase tracking-[0.22em] mb-1">Security Center</div>
+              <h2 className="text-white font-black text-2xl">System Health</h2>
+              <p className="text-zinc-400 text-sm max-w-2xl mt-1">A read-only checklist for admin security, customer account protections, database safety, and notification setup. This page does not manage orders.</p>
+            </div>
+          </div>
+          <button onClick={loadHealth} className="px-4 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black shadow-lg shadow-blue-950/30">Refresh Health Check</button>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-white font-bold text-lg">System Health</h2>
-          <p className="text-zinc-500 text-sm">A quick safety check for admin security, customer account protections, and notification setup.</p>
+          <h3 className="text-white font-bold text-lg">Live checklist</h3>
+          <p className="text-zinc-500 text-sm">Green is good. Yellow means worth reviewing. Red means stop and fix.</p>
         </div>
-        <button onClick={loadHealth} className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold">Refresh</button>
       </div>
       {err && <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-400 text-sm">{err}</div>}
       {loading ? (
         <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
       ) : health ? (
         <>
-          <div className={`rounded-3xl border p-5 ${health.ok ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-            <div className="text-white font-bold">{health.ok ? 'Core security checks look good' : 'One or more critical checks need attention'}</div>
-            <div className="text-zinc-400 text-sm mt-1">
-              Critical: {health.summary?.criticalOpen || 0} · Warnings: {health.summary?.warningsOpen || 0} · Admin users: {health.summary?.adminUsers ?? '—'} · Audit events: {health.summary?.auditEvents ?? '—'}
+          <div className="grid sm:grid-cols-4 gap-3">
+            <div className={`rounded-3xl border p-5 ${health.ok ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+              <div className="text-zinc-400 text-xs font-black uppercase tracking-wider">Status</div>
+              <div className="text-white font-black text-lg mt-1">{health.ok ? 'Healthy' : 'Needs Attention'}</div>
+            </div>
+            <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-5">
+              <div className="text-red-300 text-xs font-black uppercase tracking-wider">Critical</div>
+              <div className="text-white font-black text-2xl mt-1">{health.summary?.criticalOpen || 0}</div>
+            </div>
+            <div className="rounded-3xl border border-amber-500/20 bg-amber-500/5 p-5">
+              <div className="text-amber-300 text-xs font-black uppercase tracking-wider">Warnings</div>
+              <div className="text-white font-black text-2xl mt-1">{health.summary?.warningsOpen || 0}</div>
+            </div>
+            <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5">
+              <div className="text-zinc-500 text-xs font-black uppercase tracking-wider">Audit Events</div>
+              <div className="text-white font-black text-2xl mt-1">{health.summary?.auditEvents ?? '—'}</div>
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-3">
@@ -6585,6 +6610,7 @@ export default function AdminPage() {
       { id: 'trash', permission: 'trash' },
       { id: 'admin-users', permission: 'admin_users' },
       { id: 'audit', permission: 'admin_users' },
+      { id: 'health', permission: 'admin_users' },
       { id: 'account', permission: null },
     ].filter(t => adminCan(adminMe, t.permission))
     if (!visible.some(t => t.id === tab)) setTab(visible[0]?.id || 'storefront')
