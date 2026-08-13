@@ -2,7 +2,7 @@ export default function StorefrontTrustBar({ compact = false }) {
   const items = [
     ['🔒', 'Secure checkout', 'Protected payment and account flow.'],
     ['👤', 'Account optional', 'Browse most departments without signing in.'],
-    ['🧬', 'Peptides verified', 'Peptide access stays login + phone verified.'],
+    ['🧬', 'Peptides verified', 'Peptide access stays login + email verified.'],
     ['✨', 'New releases', 'More products are being added as departments launch.'],
   ]
 

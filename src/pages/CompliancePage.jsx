@@ -173,7 +173,7 @@ export default function CompliancePage() {
           <Section title={t.compliance.terms}>
             {isEs ? (
               <>
-                <P>Al acceder y comprar en prymelabs.cc, usted acepta estos términos de servicio en su totalidad.</P>
+                <P>Al acceder y comprar en prymelabs.net, usted acepta estos términos de servicio en su totalidad.</P>
                 <UL items={[
                   'Debe tener 21 años o más para comprar. Nos reservamos el derecho de verificar la edad y cancelar pedidos de compradores menores de edad.',
                   'Cada producto se vende sujeto a la advertencia específica de su categoría indicada arriba. Los químicos de investigación son solo para uso de laboratorio y no para consumo; los suplementos dietéticos y productos de cuidado personal son bienes de consumo que deben usarse solo según su etiqueta e indicaciones.',
@@ -187,7 +187,7 @@ export default function CompliancePage() {
               </>
             ) : (
               <>
-                <P>By accessing and purchasing from prymelabs.cc, you agree to these terms of service in their entirety.</P>
+                <P>By accessing and purchasing from prymelabs.net, you agree to these terms of service in their entirety.</P>
                 <UL items={[
                   'You must be 21 years or older to purchase. We reserve the right to verify age and cancel orders from underage purchasers.',
                   'Each product is sold subject to its category-specific disclaimer above. Research chemicals are for laboratory research use only and not for consumption; dietary supplements and personal-care products are consumer goods to be used only as labeled and directed.',

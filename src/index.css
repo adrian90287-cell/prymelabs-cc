@@ -26,8 +26,13 @@
   }
 
   body {
+    margin: 0;
     /* Safe area padding for iPhone notch / home bar */
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  #root {
+    min-height: 100vh;
   }
 
   /* Remove blue tap flash on all interactive elements (iOS/Android) */

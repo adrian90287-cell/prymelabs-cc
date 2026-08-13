@@ -15,28 +15,26 @@ const GRADIENTS = {
 
 function FreeShippingBar({ threshold, allOrders, onDismiss }) {
   return (
-    <div className="relative bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 overflow-hidden select-none">
-      {/* subtle shimmer */}
-      <div className="absolute inset-0 w-12 bg-white/15 blur-lg animate-banner-shimmer pointer-events-none" />
-      <div className="relative max-w-7xl mx-auto px-10 py-1.5 flex items-center justify-center gap-2 min-h-[34px]">
-        <div className="flex items-center gap-2 flex-wrap justify-center text-white text-xs sm:text-sm font-semibold leading-tight">
-          <span className="text-base">🚚</span>
+    <div className="relative overflow-hidden border-b border-white/10 bg-zinc-950 select-none">
+      <div className="relative max-w-7xl mx-auto px-10 py-1 flex items-center justify-center gap-2 min-h-[30px]">
+        <div className="flex items-center gap-2 flex-wrap justify-center text-white text-[11px] sm:text-xs font-black uppercase tracking-[0.16em] leading-tight">
+          <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
           {allOrders ? (
             <>
-              <span className="font-black drop-shadow-sm">FREE SHIPPING ON ALL ORDERS</span>
-              <span className="hidden sm:inline text-white/60 text-xs font-normal">— no minimum, no code needed</span>
+              <span>FREE SHIPPING ON ALL ORDERS</span>
+              <span className="hidden sm:inline text-white/45 font-semibold normal-case tracking-normal">No minimum. No code needed.</span>
             </>
           ) : (
             <>
-              <span className="drop-shadow-sm">FREE SHIPPING on orders over{' '}<span className="font-black">${Number(threshold).toFixed(0)}</span></span>
-              <span className="hidden sm:inline text-white/60 text-xs font-normal">— no code needed</span>
+              <span>FREE SHIPPING ${Number(threshold).toFixed(0)}+</span>
+              <span className="hidden sm:inline text-white/45 font-semibold normal-case tracking-normal">No code needed.</span>
             </>
           )}
         </div>
       </div>
       <button
         onClick={onDismiss}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors p-1.5 rounded-full hover:bg-black/20"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
         aria-label="Dismiss">
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
@@ -135,8 +133,7 @@ export default function PromoBanner() {
 
           <div className="relative max-w-7xl mx-auto px-10 py-2 flex items-center justify-center gap-2 min-h-[38px]">
             <div className="flex items-center gap-2 flex-wrap justify-center text-white text-xs sm:text-sm font-semibold leading-tight">
-
-              <span className="text-base">🏷</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
 
               {banner.pre_text && (
                 <span className="drop-shadow-sm">{banner.pre_text}</span>

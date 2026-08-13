@@ -15,6 +15,17 @@
 /assets/*
   Cache-Control: public, max-age=3600, must-revalidate
 
+/static/*.js
+  Cache-Control: public, max-age=3600, must-revalidate
+  Content-Type: application/javascript; charset=utf-8
+
+/static/*.css
+  Cache-Control: public, max-age=3600, must-revalidate
+  Content-Type: text/css; charset=utf-8
+
+/static/*
+  Cache-Control: public, max-age=3600, must-revalidate
+
 /*
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff

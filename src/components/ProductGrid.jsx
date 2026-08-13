@@ -5,10 +5,10 @@ import { useT } from '../context/LanguageContext'
 // ── Storefront departments (home-page tabs) ──────────────────────────────────
 export const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 'Peptides']
 export const DEPARTMENT_META = {
-  'Peptides':          { icon: '🧬', blurb: 'Research peptides, GLP analogs & recovery compounds' },
-  'Health & Wellness': { icon: '💊', blurb: 'Daily wellness, hydration, recovery & performance' },
+  'Peptides':          { icon: '🧬', blurb: 'Research compounds & laboratory products' },
+  'Health & Wellness': { icon: '💊', blurb: 'Performance nutrition, hydration & everyday wellness' },
   'Beauty & Grooming': { icon: '🧴', blurb: 'Skin, hair, beard & body care essentials' },
-  'Apparel & Gear':    { icon: '🧢', blurb: 'Apparel, drinkware & everyday Pryme gear' },
+  'Apparel & Gear':    { icon: '🧢', blurb: 'Performance apparel, training essentials & gear' },
 }
 export function departmentOf(p) {
   return DEPARTMENTS.includes(p?.department) ? p.department : 'Peptides'

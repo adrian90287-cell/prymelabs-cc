@@ -3,10 +3,11 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { LanguageProvider } from './context/LanguageContext'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
-import AgeGate from './components/AgeGate'
 import ProtectedRoute from './components/ProtectedRoute'
 import ScrollToTop from './components/ScrollToTop'
 import PhoneVerificationPrompt from './components/PhoneVerificationPrompt'
+
+const APP_BUILD_ID = '2026-08-08-restore-homepage-paint'
 
 // Route-level code splitting — each page only downloads when a visitor
 // actually navigates to it, instead of every visitor downloading every
@@ -27,7 +28,7 @@ const CompliancePage    = lazy(() => import('./pages/CompliancePage'))
 
 function PageFallback() {
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+    <div data-build={APP_BUILD_ID} className="min-h-screen bg-zinc-950 flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
   )
@@ -45,7 +46,6 @@ export default function App() {
       <AuthProvider>
         <CartProvider>
           <BrowserRouter>
-            <AgeGate />
             <ScrollToTop />
             <GlobalPhoneVerificationPrompt />
             <Suspense fallback={<PageFallback />}>

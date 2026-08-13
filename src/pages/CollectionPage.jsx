@@ -17,6 +17,7 @@ import {
   departmentFromSlug, collectionFromSlug, slugify,
   filterByCollection, departmentOf,
 } from '../lib/collections'
+import { publicCountLabel } from '../lib/storefrontMeta'
 
 const inStock = (p) => p.in_stock !== 0 && p.in_stock !== false
 
@@ -37,6 +38,37 @@ const DEPT_HERO_POSITION = {
   'Beauty & Grooming':  'center 70%',
 }
 
+const DEPT_BRAND = {
+  'Peptides': 'PRYME LABS',
+  'Health & Wellness': 'VYTRA',
+  'Beauty & Grooming': 'VELOURIX + MATRIX',
+  'Apparel & Gear': 'VYTRA',
+}
+
+function DepartmentHero({ department, title, subtitle, image }) {
+  const img = image || DEPT_HERO[department]
+  const brand = DEPT_BRAND[department] || 'PRYME LABS'
+  const green = department === 'Health & Wellness' || department === 'Apparel & Gear'
+  const beauty = department === 'Beauty & Grooming'
+
+  return (
+    <div className={`relative mb-6 h-64 overflow-hidden rounded-lg border ${green ? 'border-lime-300/25 bg-black' : beauty ? 'border-zinc-300/20 bg-zinc-950' : 'border-blue-500/25 bg-zinc-950'} sm:h-80`}>
+      {img ? (
+        <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: DEPT_HERO_POSITION[department] || 'center' }} />
+      ) : (
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(163,230,53,0.28),rgba(0,0,0,0)_44%),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[length:100%_100%,32px_32px]" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/45 to-black/10" />
+      <div className="relative flex h-full flex-col justify-end p-5 sm:p-7">
+        <p className={`text-[11px] font-black uppercase tracking-[0.26em] ${green ? 'text-lime-300' : 'text-blue-300'}`}>{brand}</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] sm:text-5xl">{title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-200 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:text-base">{subtitle}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function CollectionPage() {
   const { deptSlug, colSlug } = useParams()
   const navigate = useNavigate()
@@ -44,6 +76,7 @@ export default function CollectionPage() {
   const { user, loading: authLoading } = useAuth()
   const { products, showWasPrice, loading } = useProductCatalog()
   const [coaDocs, setCoaDocs] = useState([])
+  const [departmentHeroes, setDepartmentHeroes] = useState({})
   const [search, setSearch] = useState('')
   const [peptideAcked, setPeptideAcked] = useState(hasAckedPeptideGate())
 
@@ -66,6 +99,13 @@ export default function CollectionPage() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    fetch('/api/storefront/home-media', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(data => setDepartmentHeroes(data.departmentHeroes || {}))
+      .catch(() => {})
+  }, [])
+
   // Unknown department slug → fall back to the shop
   useEffect(() => {
     if (!loading && !department) navigate('/shop', { replace: true })
@@ -74,7 +114,7 @@ export default function CollectionPage() {
   // Peptides stay restricted even though the rest of the storefront is public.
   useEffect(() => {
     if (!authLoading && department === 'Peptides' && !canViewPeptides && !user && !isAdmin) {
-      navigate('/auth', { replace: true })
+      navigate('/auth', { replace: true, state: { peptideAccess: true } })
     }
   }, [authLoading, department, canViewPeptides, user, isAdmin, navigate])
 
@@ -159,27 +199,13 @@ export default function CollectionPage() {
           </button>
         )}
 
-        {/* Section title — banner photo behind the department name */}
-        {DEPT_HERO[department] ? (
-          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 mb-6 h-56 sm:h-80">
-            <img src={DEPT_HERO[department]} alt="" className="absolute inset-0 h-full w-full object-cover"
-              style={{ objectPosition: DEPT_HERO_POSITION[department] || 'center' }} />
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/35 to-transparent" />
-            <div className="relative h-full flex flex-col justify-end p-4 sm:p-6">
-              <h1 className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{collection ? colName : deptName}</h1>
-              <p className="text-zinc-200 mt-1 text-sm sm:text-base drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                {collection ? `${deptName} · ${colName}` : deptSubtitle}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-6">
-            <h1 className="text-3xl font-black text-white">{collection ? colName : deptName}</h1>
-            <p className="text-zinc-500 mt-1">
-              {collection ? `${deptName} · ${colName}` : deptSubtitle}
-            </p>
-          </div>
-        )}
+        {/* Section title — premium department entry while preserving routing */}
+        <DepartmentHero
+          department={department}
+          title={collection ? colName : deptName}
+          subtitle={collection ? `${deptName} · ${colName}` : deptSubtitle}
+          image={departmentHeroes[department]}
+        />
 
         {department !== 'Peptides' && <StorefrontTrustBar compact />}
 
@@ -220,7 +246,7 @@ export default function CollectionPage() {
                 onClick={() => navigate(card.target ? `/collections/${deptSlug}/${card.target}` : `/collections/${deptSlug}`)}
                 className="text-left bg-zinc-900 border border-zinc-800 hover:border-blue-700/50 rounded-xl p-4 transition-colors">
                 <div className="text-white font-bold text-sm leading-snug">{card.name}</div>
-                <div className="text-zinc-500 text-xs mt-1">{t.home.products(card.count)}</div>
+                <div className="text-zinc-500 text-xs mt-1">{publicCountLabel(card.count, department, t)}</div>
               </button>
             ))}
           </div>

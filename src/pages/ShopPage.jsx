@@ -141,7 +141,7 @@ export default function ShopPage() {
   useEffect(() => {
     if (!authLoading && department === 'Peptides' && !canViewPeptides && !user && !isAdmin) {
       selectDepartment('All')
-      navigate('/auth')
+      navigate('/auth', { state: { peptideAccess: true } })
     }
   }, [authLoading, department, canViewPeptides, user, isAdmin])
 
@@ -158,7 +158,7 @@ export default function ShopPage() {
   // Selecting a department resets the sub-category and syncs the URL (?dept=)
   const selectDepartment = (dep) => {
     if (dep === 'Peptides' && !canViewPeptides && !user && !isAdmin) {
-      navigate('/auth')
+      navigate('/auth', { state: { peptideAccess: true } })
       return
     }
     setDepartment(dep)
@@ -245,7 +245,9 @@ export default function ShopPage() {
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shrink-0 ${department === dep ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>
                 {dep !== 'All' && <span>{DEPARTMENT_META[dep]?.icon}</span>}
                 {dep === 'All' ? t.shop.allProducts : (t.shop.departmentNames?.[dep] || dep)}
-                <span className={`text-xs rounded-full px-1.5 ${department === dep ? 'bg-white/20' : 'bg-zinc-800'}`}>{deptCount(dep)}</span>
+                {deptCount(dep) > 0 && (
+                  <span className={`text-xs rounded-full px-1.5 ${department === dep ? 'bg-white/20' : 'bg-zinc-800'}`}>{deptCount(dep)}</span>
+                )}
               </button>
             ))}
           </div>
@@ -283,12 +285,12 @@ export default function ShopPage() {
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all ${stockFilter === 'instock' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'}`}>
               <span className={`w-2 h-2 rounded-full ${stockFilter === 'instock' ? 'bg-white' : 'bg-green-400'}`} />
               {t.shop.inStock}
-              <span className={`text-xs rounded-full px-1.5 ${stockFilter === 'instock' ? 'bg-white/20' : 'bg-zinc-700'}`}>{inStockCount}</span>
+              {inStockCount > 0 && <span className={`text-xs rounded-full px-1.5 ${stockFilter === 'instock' ? 'bg-white/20' : 'bg-zinc-700'}`}>{inStockCount}</span>}
             </button>
             <button onClick={() => setStockFilter('all')}
               className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${stockFilter === 'all' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'}`}>
               {t.shop.allProducts}
-              <span className={`ml-1.5 text-xs rounded-full px-1.5 ${stockFilter === 'all' ? 'bg-white/20' : 'bg-zinc-700'}`}>{allGroups.length}</span>
+              {allGroups.length > 0 && <span className={`ml-1.5 text-xs rounded-full px-1.5 ${stockFilter === 'all' ? 'bg-white/20' : 'bg-zinc-700'}`}>{allGroups.length}</span>}
             </button>
           </div>
         )}
