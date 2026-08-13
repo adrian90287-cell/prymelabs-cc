@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useT } from '../context/LanguageContext'
 import { departmentSlug } from '../lib/collections'
 
@@ -6,18 +6,26 @@ const DEPT_LINKS = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 
 
 export default function Footer() {
   const navigate = useNavigate()
+  const location = useLocation()
   const t = useT()
   const labels = t.footer.columns
 
-  const goDepartment = (department) => navigate(`/collections/${departmentSlug(department)}`)
-  const goCompliance = () => navigate('/legal-compliance')
+  const go = (path) => {
+    if (location.pathname === path && !location.search) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+      return
+    }
+    navigate(path)
+  }
+  const goDepartment = (department) => go(`/collections/${departmentSlug(department)}`)
+  const goCompliance = () => go('/legal-compliance')
 
   return (
     <footer className="border-t border-zinc-800/70 bg-[#07080b]" data-build="premium-storefront-1">
       <div className="mx-auto max-w-7xl px-4 py-10">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.15fr_0.8fr_0.8fr_0.8fr_0.8fr]">
           <div>
-            <button onClick={() => navigate('/')}
+            <button onClick={() => go('/')}
               className="flex items-center gap-1.5 text-white font-black text-base tracking-widest hover:opacity-80 transition-opacity">
               <img src="/logo-mark.png" alt="" className="h-5 w-auto" />
               PRYME<span className="text-blue-500">LABS</span>
@@ -56,7 +64,7 @@ export default function Footer() {
               <a href="mailto:support@prymelabs.net" className="text-zinc-400 transition-colors hover:text-white">{labels.contact}</a>
               <button onClick={goCompliance} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.shipping}</button>
               <button onClick={goCompliance} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.returns}</button>
-              <button onClick={() => navigate('/track')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.orderTracking}</button>
+              <button onClick={() => go('/track')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.orderTracking}</button>
               <button onClick={goCompliance} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.faq}</button>
             </div>
           </div>
@@ -64,8 +72,8 @@ export default function Footer() {
           <div>
             <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-500">{labels.legal}</h3>
             <div className="mt-3 grid gap-2 text-sm">
-              <button onClick={() => navigate('/terms')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.terms}</button>
-              <button onClick={() => navigate('/privacy')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.privacy}</button>
+              <button onClick={() => go('/terms')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.terms}</button>
+              <button onClick={() => go('/privacy')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.privacy}</button>
               <button onClick={goCompliance} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.legalCompliance}</button>
             </div>
           </div>
