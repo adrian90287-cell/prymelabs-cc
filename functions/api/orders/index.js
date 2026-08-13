@@ -378,7 +378,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       tax_rate, tax_amount, order_total, local_delivery
     ) VALUES ('TEMP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    payload?.sub || null, customerName, customerEmail,
+    payload?.sub || 0, customerName, customerEmail,
     JSON.stringify(dbItems), JSON.stringify(shipping), subtotal, payment_method,
     applied_promo_code, discount_amount, shipping_rate_name, shipping_cost,
     tax_rate, tax_amount, order_total, isLocalDelivery ? 1 : 0
