@@ -308,6 +308,8 @@ export default function CheckoutPage() {
   const [addressSuggestions, setAddressSuggestions] = useState([])
   const placesLibRef = useRef(null)
   const sessionTokenRef = useRef(null)
+  const autocompleteServiceRef = useRef(null)
+  const placesServiceRef = useRef(null)
   const orderPlacedRef = useRef(false) // guards the empty-cart redirect after a successful order
 
   const location = useLocation()
@@ -448,8 +450,17 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!googleMapsKey) return
 
-    const initLib = () => {
-      const places = window.google?.maps?.places
+    const initLib = async () => {
+      const maps = window.google?.maps
+      let places = maps?.places
+      if (maps?.importLibrary) {
+        try {
+          const imported = await maps.importLibrary('places')
+          places = { ...(places || {}), ...(imported || {}) }
+        } catch {
+          // Fall back to the legacy places namespace loaded by libraries=places.
+        }
+      }
       if (!places) return
       placesLibRef.current = places
       sessionTokenRef.current = new places.AutocompleteSessionToken()
@@ -464,7 +475,7 @@ export default function CheckoutPage() {
 
     const script = document.createElement('script')
     script.id = scriptId
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places&v=weekly`
     script.async = true
     script.defer = true
     script.onload = initLib
@@ -479,31 +490,77 @@ export default function CheckoutPage() {
     try {
       if (!sessionTokenRef.current)
         sessionTokenRef.current = new places.AutocompleteSessionToken()
-      const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-        input: value,
-        sessionToken: sessionTokenRef.current,
-        includedRegionCodes: ['us'],
+      if (places.AutocompleteSuggestion?.fetchAutocompleteSuggestions) {
+        const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: value,
+          sessionToken: sessionTokenRef.current,
+          includedRegionCodes: ['us'],
+        })
+        setAddressSuggestions((suggestions || []).slice(0, 5))
+        return
+      }
+
+      if (!autocompleteServiceRef.current && places.AutocompleteService) {
+        autocompleteServiceRef.current = new places.AutocompleteService()
+      }
+      const service = autocompleteServiceRef.current
+      if (!service) { setAddressSuggestions([]); return }
+
+      const predictions = await new Promise(resolve => {
+        service.getPlacePredictions({
+          input: value,
+          componentRestrictions: { country: 'us' },
+          sessionToken: sessionTokenRef.current,
+        }, (results, status) => {
+          if (status === places.PlacesServiceStatus?.OK) resolve(results || [])
+          else resolve([])
+        })
       })
-      setAddressSuggestions((suggestions || []).slice(0, 5))
+      setAddressSuggestions((predictions || []).slice(0, 5).map(prediction => ({ legacyPrediction: prediction })))
     } catch { setAddressSuggestions([]) }
   }
 
   const selectAddressSuggestion = async (suggestion) => {
     const places = placesLibRef.current || window.google?.maps?.places
     try {
-      const place = suggestion.placePrediction.toPlace()
-      await place.fetchFields({ fields: ['addressComponents', 'location'] })
-      let streetNumber = '', route = '', city = '', state = '', zip = ''
-      for (const comp of (place.addressComponents || [])) {
-        const type = comp.types[0]
-        if (type === 'street_number') streetNumber = comp.longText
-        else if (type === 'route') route = comp.shortText
-        else if (type === 'locality') city = comp.longText
-        else if (type === 'administrative_area_level_1') state = comp.shortText
-        else if (type === 'postal_code') zip = comp.longText
+      let streetNumber = '', route = '', city = '', state = '', zip = '', lat = null, lng = null
+      if (suggestion.placePrediction?.toPlace) {
+        const place = suggestion.placePrediction.toPlace()
+        await place.fetchFields({ fields: ['addressComponents', 'location'] })
+        for (const comp of (place.addressComponents || [])) {
+          const type = comp.types[0]
+          if (type === 'street_number') streetNumber = comp.longText
+          else if (type === 'route') route = comp.shortText
+          else if (type === 'locality') city = comp.longText
+          else if (type === 'administrative_area_level_1') state = comp.shortText
+          else if (type === 'postal_code') zip = comp.longText
+        }
+        lat = typeof place.location?.lat === 'function' ? place.location.lat() : null
+        lng = typeof place.location?.lng === 'function' ? place.location.lng() : null
+      } else if (suggestion.legacyPrediction?.place_id && places?.PlacesService) {
+        if (!placesServiceRef.current) {
+          placesServiceRef.current = new places.PlacesService(document.createElement('div'))
+        }
+        const place = await new Promise((resolve, reject) => {
+          placesServiceRef.current.getDetails({
+            placeId: suggestion.legacyPrediction.place_id,
+            fields: ['address_components', 'geometry'],
+            sessionToken: sessionTokenRef.current,
+          }, (result, status) => {
+            if (status === places.PlacesServiceStatus?.OK) resolve(result)
+            else reject(new Error(status || 'Address lookup failed'))
+          })
+        })
+        for (const comp of (place.address_components || [])) {
+          if (comp.types.includes('street_number')) streetNumber = comp.long_name
+          else if (comp.types.includes('route')) route = comp.short_name
+          else if (comp.types.includes('locality')) city = comp.long_name
+          else if (comp.types.includes('administrative_area_level_1')) state = comp.short_name
+          else if (comp.types.includes('postal_code')) zip = comp.long_name
+        }
+        lat = typeof place.geometry?.location?.lat === 'function' ? place.geometry.location.lat() : null
+        lng = typeof place.geometry?.location?.lng === 'function' ? place.geometry.location.lng() : null
       }
-      const lat = typeof place.location?.lat === 'function' ? place.location.lat() : null
-      const lng = typeof place.location?.lng === 'function' ? place.location.lng() : null
       setShipping(prev => ({
         ...prev,
         address: [streetNumber, route].filter(Boolean).join(' '),
@@ -832,8 +889,8 @@ export default function CheckoutPage() {
                           <button type="button"
                             onMouseDown={() => selectAddressSuggestion(s)}
                             className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-zinc-700 transition-colors">
-                            <span className="font-medium">{s.placePrediction.mainText?.toString()}</span>
-                            <span className="text-zinc-400 text-xs ml-2">{s.placePrediction.secondaryText?.toString()}</span>
+                            <span className="font-medium">{s.placePrediction?.mainText?.toString() || s.legacyPrediction?.structured_formatting?.main_text || s.legacyPrediction?.description}</span>
+                            <span className="text-zinc-400 text-xs ml-2">{s.placePrediction?.secondaryText?.toString() || s.legacyPrediction?.structured_formatting?.secondary_text || ''}</span>
                           </button>
                         </li>
                       ))}
