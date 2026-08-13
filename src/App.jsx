@@ -25,6 +25,9 @@ const OrderHistoryPage  = lazy(() => import('./pages/OrderHistoryPage'))
 const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
 const AdminPage         = lazy(() => import('./pages/AdminPage'))
 const CompliancePage    = lazy(() => import('./pages/CompliancePage'))
+const TermsPage         = lazy(() => import('./pages/TermsPage'))
+const PrivacyPage       = lazy(() => import('./pages/PrivacyPage'))
+const LegalCompliancePage = lazy(() => import('./pages/LegalCompliancePage'))
 
 function PageFallback() {
   return (
@@ -62,6 +65,9 @@ export default function App() {
                 <Route path="/orders" element={<ProtectedRoute><OrderHistoryPage /></ProtectedRoute>} />
                 <Route path="/track" element={<OrderTrackingPage />} />
                 <Route path="/compliance" element={<CompliancePage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/legal-compliance" element={<LegalCompliancePage />} />
               </Routes>
             </Suspense>
           </BrowserRouter>

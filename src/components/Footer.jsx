@@ -10,7 +10,7 @@ export default function Footer() {
   const labels = t.footer.columns
 
   const goDepartment = (department) => navigate(`/collections/${departmentSlug(department)}`)
-  const goCompliance = () => navigate('/compliance')
+  const goCompliance = () => navigate('/legal-compliance')
 
   return (
     <footer className="border-t border-zinc-800/70 bg-[#07080b]" data-build="premium-storefront-1">
@@ -64,8 +64,8 @@ export default function Footer() {
           <div>
             <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-500">{labels.legal}</h3>
             <div className="mt-3 grid gap-2 text-sm">
-              <button onClick={goCompliance} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.terms}</button>
-              <button onClick={goCompliance} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.privacy}</button>
+              <button onClick={() => navigate('/terms')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.terms}</button>
+              <button onClick={() => navigate('/privacy')} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.privacy}</button>
               <button onClick={goCompliance} className="text-left text-zinc-400 transition-colors hover:text-white">{labels.legalCompliance}</button>
             </div>
           </div>
