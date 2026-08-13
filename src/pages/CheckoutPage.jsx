@@ -321,6 +321,8 @@ export default function CheckoutPage() {
     cartTotals,
     clearCart,
     reconcilePrices,
+    mainCount,
+    peptideCount,
     CART_TYPES,
   } = useCart()
   const { token, user } = useAuth()
@@ -333,6 +335,49 @@ export default function CheckoutPage() {
   const hasPeptides = checkoutCart === CART_TYPES.PEPTIDES
   const isGuest = !token
   const availableMethods = hasPeptides ? METHODS : [STRIPE_METHOD]
+  const switchCheckoutCart = (type) => {
+    if (type === checkoutCart) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+      return
+    }
+    setStep('form')
+    setError('')
+    navigate(`/checkout?cart=${type}`)
+  }
+  const CartCheckoutSwitcher = () => (
+    <div className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Checkout Cart</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            {hasPeptides
+              ? 'Peptide checkout uses verified manual payment only.'
+              : 'Main cart checkout uses secure card payment through Stripe.'}
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => switchCheckoutCart(CART_TYPES.MAIN)}
+          disabled={mainCount === 0}
+          className={`rounded-xl border px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${checkoutCart === CART_TYPES.MAIN ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-zinc-800 bg-zinc-950/50 text-zinc-400 hover:text-white'}`}
+        >
+          <span className="block text-sm font-black">Main Cart</span>
+          <span className="mt-0.5 block text-xs text-zinc-500">{mainCount} item{mainCount === 1 ? '' : 's'} · Card / Apple Pay</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => switchCheckoutCart(CART_TYPES.PEPTIDES)}
+          disabled={peptideCount === 0}
+          className={`rounded-xl border px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${checkoutCart === CART_TYPES.PEPTIDES ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-zinc-800 bg-zinc-950/50 text-zinc-400 hover:text-white'}`}
+        >
+          <span className="block text-sm font-black">Peptide Cart</span>
+          <span className="mt-0.5 block text-xs text-zinc-500">{peptideCount} item{peptideCount === 1 ? '' : 's'} · Zelle / Cash App / Venmo</span>
+        </button>
+      </div>
+    </div>
+  )
 
   useEffect(() => {
     if (activeCart !== checkoutCart) setActiveCart(checkoutCart)
@@ -688,6 +733,8 @@ export default function CheckoutPage() {
             {t.checkout.reviewTitle}
           </div>
         </div>
+
+        <CartCheckoutSwitcher />
 
         {/* ── REVIEW STEP ── */}
         {step === 'review' && (
