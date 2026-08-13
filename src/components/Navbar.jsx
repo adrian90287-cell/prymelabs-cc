@@ -12,7 +12,7 @@ function LangToggle() {
     <div className="flex rounded-lg overflow-hidden border border-zinc-800">
       {['en', 'es'].map(l => (
         <button key={l} onClick={() => setLanguage(l)}
-          className={`px-2.5 py-1.5 text-xs font-bold transition-colors uppercase ${lang === l ? 'bg-blue-600 text-white' : 'bg-transparent text-zinc-500 hover:text-white'}`}>
+          className={`px-2 py-1.5 sm:px-2.5 text-xs font-bold transition-colors uppercase ${lang === l ? 'bg-blue-600 text-white' : 'bg-transparent text-zinc-500 hover:text-white'}`}>
           {l}
         </button>
       ))}
@@ -22,7 +22,7 @@ function LangToggle() {
 
 export default function Navbar() {
   const { user, logout } = useAuth()
-  const { itemCount, setIsOpen } = useCart()
+  const { totalItemCount, setIsOpen } = useCart()
   const navigate = useNavigate()
   const t = useT()
   const [openDept, setOpenDept] = useState(null)   // desktop dropdown
@@ -46,13 +46,13 @@ export default function Navbar() {
     <div className="sticky top-0 z-30" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <PromoBanner />
       <nav className="bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/60" data-build="cache-bust-1">
-        <div className="max-w-7xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-2">
 
           {/* Left: mobile menu button + logo + desktop department nav */}
           <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             {/* Mobile hamburger */}
             <button onClick={() => setMobileOpen(o => !o)}
-              className="sm:hidden p-2 -ml-2 text-zinc-300 hover:text-white transition-colors rounded-lg hover:bg-zinc-800"
+              className="sm:hidden p-1.5 -ml-1.5 text-zinc-300 hover:text-white transition-colors rounded-lg hover:bg-zinc-800"
               aria-label="Menu" aria-expanded={mobileOpen}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {mobileOpen
@@ -63,8 +63,8 @@ export default function Navbar() {
 
             {/* Logo */}
             <button onClick={() => go('/')}
-              className="flex items-center gap-1.5 text-lg sm:text-xl font-black text-white tracking-widest hover:opacity-80 transition-opacity shrink-0">
-              <img src="/logo-mark.png" alt="" className="h-6 sm:h-7 w-auto" />
+              className="flex items-center gap-1 text-base sm:text-xl font-black text-white tracking-widest hover:opacity-80 transition-opacity shrink-0">
+              <img src="/logo-mark.png" alt="" className="h-5 sm:h-7 w-auto" />
               PRYME<span className="text-blue-500">LABS</span>
             </button>
 
@@ -102,7 +102,7 @@ export default function Navbar() {
           </div>
 
           {/* Right side controls */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-2">
             {user && (
               <span className="text-zinc-400 text-sm hidden lg:block mr-1">
                 {t.nav.hey} <span className="text-white font-medium">{user.name.split(' ')[0]}</span>
@@ -128,28 +128,46 @@ export default function Navbar() {
             <LangToggle />
 
             <button onClick={() => setIsOpen(true)}
-              className="relative p-2 text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-zinc-800"
+              className="relative p-1.5 sm:p-2 text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-zinc-800"
               aria-label="Open cart">
               <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-              {itemCount > 0 && (
+              {totalItemCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold leading-none">
-                  {itemCount > 9 ? '9+' : itemCount}
+                  {totalItemCount > 9 ? '9+' : totalItemCount}
                 </span>
               )}
             </button>
 
             {user ? (
-              <button onClick={handleLogout}
-                className="text-xs sm:text-sm text-zinc-500 hover:text-white transition-colors px-2 py-1.5 rounded-lg hover:bg-zinc-800">
-                {t.nav.logout}
-              </button>
+              <>
+                <button onClick={handleLogout}
+                  className="hidden sm:block text-xs sm:text-sm text-zinc-500 hover:text-white transition-colors px-2 py-1.5 rounded-lg hover:bg-zinc-800">
+                  {t.nav.logout}
+                </button>
+                <button onClick={handleLogout}
+                  className="sm:hidden p-1.5 text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-zinc-800"
+                  aria-label={t.nav.logout}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H3m12 0l-4-4m4 4l-4 4M21 4v16" />
+                  </svg>
+                </button>
+              </>
             ) : (
-              <button onClick={() => navigate('/auth')}
-                className="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors px-3 py-1.5 rounded-lg">
-                {t.nav.signIn}
-              </button>
+              <>
+                <button onClick={() => navigate('/auth')}
+                  className="hidden sm:block text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors px-3 py-1.5 rounded-lg">
+                  {t.nav.signIn}
+                </button>
+                <button onClick={() => navigate('/auth')}
+                  className="sm:hidden p-1.5 bg-blue-600 hover:bg-blue-700 text-white transition-colors rounded-lg"
+                  aria-label={t.nav.signIn}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 0115 0" />
+                  </svg>
+                </button>
+              </>
             )}
           </div>
         </div>

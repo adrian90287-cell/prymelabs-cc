@@ -15,6 +15,76 @@ import { pushToAll } from '../../_utils/webpush.js'
 import { uploadToOneDrive, downloadFromOneDrive } from '../../_utils/onedrive.js'
 import { orderReceiptHtml, taxRecordHtml, orderCsvRow, buildCsv } from '../../_utils/documents.js'
 
+function toNumber(value) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function stripeAmount(value) {
+  return Math.round(Number(value || 0) * 100)
+}
+
+async function createStripeCheckoutSession(env, {
+  origin,
+  orderId,
+  orderNumber,
+  customerEmail,
+  total,
+}) {
+  if (!env.STRIPE_SECRET_KEY) {
+    throw new Error('Stripe is not configured yet. Add STRIPE_SECRET_KEY before testing card checkout.')
+  }
+
+  const params = new URLSearchParams()
+  params.set('mode', 'payment')
+  params.set('client_reference_id', orderNumber)
+  params.set('customer_email', customerEmail)
+  params.set('success_url', `${origin}/order-confirmation?stripe=success&order=${encodeURIComponent(orderNumber)}`)
+  params.set('cancel_url', `${origin}/checkout?stripe=cancelled&order=${encodeURIComponent(orderNumber)}`)
+  params.set('payment_method_types[]', 'card')
+  params.set('metadata[order_id]', String(orderId))
+  params.set('metadata[order_number]', orderNumber)
+  params.set('line_items[0][quantity]', '1')
+  params.set('line_items[0][price_data][currency]', 'usd')
+  params.set('line_items[0][price_data][unit_amount]', String(stripeAmount(total)))
+  params.set('line_items[0][price_data][product_data][name]', `Pryme Labs Order ${orderNumber}`)
+
+  const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data?.error?.message || 'Stripe checkout could not be started.')
+  }
+  if (!data.url) throw new Error('Stripe did not return a checkout URL.')
+  return data
+}
+
+function haversineMiles(lat1, lng1, lat2, lng2) {
+  const R = 3958.8
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+async function loadLocalDeliverySettings(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT key, value FROM settings WHERE key IN ('local_delivery_enabled','local_delivery_radius_miles','local_delivery_hub_lat','local_delivery_hub_lng','local_delivery_flat_rate')"
+  ).all()
+  const cfg = {}
+  for (const r of (results || [])) cfg[r.key] = r.value
+  return cfg
+}
+
 export async function onRequestPost({ request, env, waitUntil }) {
   const authHeader = request.headers.get('Authorization')
   let payload = null
@@ -34,7 +104,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   if (!Array.isArray(items) || items.length === 0) return json({ error: 'Cart is empty' }, 400)
   if (items.length > 50) return json({ error: 'Too many items in cart' }, 400)
-  if (!['zelle', 'cashapp', 'venmo'].includes(payment_method)) return json({ error: 'Invalid payment method' }, 400)
+  if (!['zelle', 'cashapp', 'venmo', 'stripe'].includes(payment_method)) return json({ error: 'Invalid payment method' }, 400)
   if (!shipping?.address || !shipping?.city || !shipping?.state || !shipping?.zip) {
     return json({ error: 'Complete shipping address required' }, 400)
   }
@@ -128,8 +198,16 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   const subtotal = Number(dbItems.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(2))
-  if (!payload && dbItems.some(i => i.department === 'Peptides')) {
+  const hasPeptides = dbItems.some(i => (i.department || 'Peptides') === 'Peptides')
+  const hasNonPeptides = dbItems.some(i => (i.department || 'Peptides') !== 'Peptides')
+  if (hasPeptides && hasNonPeptides) {
+    return json({ error: 'Peptide products must be checked out separately from other departments.' }, 400)
+  }
+  if (!payload && hasPeptides) {
     return json({ error: 'Login is required for Peptides checkout' }, 401)
+  }
+  if (payment_method === 'stripe' && hasPeptides) {
+    return json({ error: 'Card checkout is not available for Peptides. Please check out peptide items separately.' }, 400)
   }
   // Only non-case items are eligible for promo discounts
   const discountableSubtotal = Number(dbItems.reduce((sum, i) => sum + (i.no_discount ? 0 : i.price * i.qty), 0).toFixed(2))
@@ -204,8 +282,29 @@ export async function onRequestPost({ request, env, waitUntil }) {
   let shipping_rate_name = null
   const isLocalDelivery = !!local_delivery
   if (isLocalDelivery) {
-    const ldRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'local_delivery_flat_rate'").first()
-    shipping_cost = Number(ldRow?.value) || 50
+    const ld = await loadLocalDeliverySettings(env)
+    if (ld.local_delivery_enabled !== '1') {
+      return json({ error: 'Same-day local delivery is not currently available.' }, 400)
+    }
+
+    const hubLat = toNumber(ld.local_delivery_hub_lat) ?? 29.7065
+    const hubLng = toNumber(ld.local_delivery_hub_lng) ?? -95.3127
+    const dropoffLat = toNumber(shipping.lat)
+    const dropoffLng = toNumber(shipping.lng)
+    const radiusMiles = Number(ld.local_delivery_radius_miles) || 15
+
+    if (dropoffLat == null || dropoffLng == null) {
+      return json({ error: 'Select your address from the suggestions to use same-day local delivery.' }, 400)
+    }
+
+    const distanceMiles = haversineMiles(hubLat, hubLng, dropoffLat, dropoffLng)
+    if (distanceMiles > radiusMiles) {
+      return json({ error: `Same-day local delivery is only available within ${radiusMiles} miles of our Houston hub.` }, 400)
+    }
+
+    shipping.local_delivery_distance_miles = Number(distanceMiles.toFixed(2))
+    shipping.local_delivery_verified_at = Math.floor(Date.now() / 1000)
+    shipping_cost = Number(ld.local_delivery_flat_rate) || 50
     shipping_rate_name = 'Same-Day Local Delivery'
   } else if (shipping_rate_id) {
     const rate = await env.DB.prepare(
@@ -297,6 +396,44 @@ export async function onRequestPost({ request, env, waitUntil }) {
     await env.DB.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?').bind(resolvedPartner.id).run()
   }
 
+  if (payment_method === 'stripe') {
+    try {
+      const origin = new URL(request.url).origin
+      const session = await createStripeCheckoutSession(env, {
+        origin,
+        orderId,
+        orderNumber,
+        customerEmail,
+        total: order_total,
+      })
+      return json({
+        order_number: orderNumber,
+        payment_method,
+        subtotal,
+        discount_amount,
+        shipping_cost,
+        shipping_rate_name,
+        tax_amount,
+        order_total,
+        stripe_checkout_url: session.url,
+        stripe_session_id: session.id,
+      })
+    } catch (err) {
+      for (const d of reserved) {
+        await env.DB.prepare('UPDATE products SET stock_qty = stock_qty + ?, in_stock = 1 WHERE id = ?').bind(d.qty, d.product_id).run()
+      }
+      if (resolvedPromo) {
+        await env.DB.prepare('UPDATE promo_codes SET used_count = MAX(0, used_count - 1) WHERE id = ?').bind(resolvedPromo.id).run()
+      }
+      if (resolvedPartner) {
+        await env.DB.prepare('UPDATE promo_codes SET used_count = MAX(0, used_count - 1) WHERE id = ?').bind(resolvedPartner.id).run()
+      }
+      await env.DB.prepare("UPDATE orders SET status = 'cancelled', notes = ? WHERE id = ?")
+        .bind(`Stripe checkout start failed: ${err.message}`, orderId).run()
+      return json({ error: err.message || 'Stripe checkout could not be started.' }, 502)
+    }
+  }
+
   // ── Low-stock alert (stock was already reserved above) ─────────────────────
   // Dedupe by the actual stock-owning product (a case + singles share a parent)
   const stockItems = [...new Map(reservationPlan.map(i => [i.product_id, i])).values()]
@@ -319,12 +456,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
           waitUntil(sendEmail(env, {
             to: env.OWNER_EMAIL,
             subject: `⚠️ Low Stock Alert — ${alertProducts.length} product${alertProducts.length > 1 ? 's' : ''} need restocking`,
-            html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#09090b;font-family:Inter,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;padding:32px 16px"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#12121f;border-radius:16px 16px 0 0;padding:24px 32px;border-bottom:1px solid #1e1e2e"><img src="https://prymelabs.cc/logo-mark.png" alt="" width="17" height="18" style="vertical-align:middle;margin-right:6px" /><span style="color:#fff;font-size:20px;font-weight:800;letter-spacing:0.12em;vertical-align:middle">PRYME<span style="color:#3b82f6">LABS</span></span></td></tr><tr><td style="background:#12121f;padding:32px"><p style="color:#f59e0b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin:0 0 8px">Low Stock Alert</p><h2 style="color:#fff;font-size:20px;margin:0 0 20px">Products running low after order ${orderNumber}</h2><table width="100%" cellpadding="0" cellspacing="0"><thead><tr><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:left">Product</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Current Qty</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Alert Threshold</th></tr></thead><tbody>${alertRows}</tbody></table></td></tr></table></td></tr></table></body></html>`,
+            html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#09090b;font-family:Inter,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;padding:32px 16px"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#12121f;border-radius:16px 16px 0 0;padding:24px 32px;border-bottom:1px solid #1e1e2e"><img src="https://prymelabs.net/logo-mark.png" alt="" width="17" height="18" style="vertical-align:middle;margin-right:6px" /><span style="color:#fff;font-size:20px;font-weight:800;letter-spacing:0.12em;vertical-align:middle">PRYME<span style="color:#3b82f6">LABS</span></span></td></tr><tr><td style="background:#12121f;padding:32px"><p style="color:#f59e0b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin:0 0 8px">Low Stock Alert</p><h2 style="color:#fff;font-size:20px;margin:0 0 20px">Products running low after order ${orderNumber}</h2><table width="100%" cellpadding="0" cellspacing="0"><thead><tr><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:left">Product</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Current Qty</th><th style="padding:8px 12px;background:#1a1a2e;color:#71717a;font-size:11px;text-transform:uppercase;text-align:center">Alert Threshold</th></tr></thead><tbody>${alertRows}</tbody></table></td></tr></table></td></tr></table></body></html>`,
           }).catch(() => {}))
         }
         // SMS low stock alert to owner
         waitUntil(sendSMS(env, {
-          message: `⚠️ Low Stock after order ${orderNumber}:\n${alertProducts.map(p => `• ${p.name}: ${p.qty} left (alert at ${p.threshold})`).join('\n')}\nRestock soon: https://prymelabs.cc/admin`,
+          message: `⚠️ Low Stock after order ${orderNumber}:\n${alertProducts.map(p => `• ${p.name}: ${p.qty} left (alert at ${p.threshold})`).join('\n')}\nRestock soon: https://prymelabs.net/admin`,
         }).catch(() => {}))
       }
     }

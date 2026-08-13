@@ -5,7 +5,20 @@ import { useAuth } from '../context/AuthContext'
 import { useT } from '../context/LanguageContext'
 
 export default function CartSidebar() {
-  const { items, isOpen, setIsOpen, removeItem, updateQty, total, itemCount } = useCart()
+  const {
+    items,
+    activeCart,
+    setActiveCart,
+    isOpen,
+    setIsOpen,
+    removeItem,
+    updateQty,
+    total,
+    itemCount,
+    mainCount,
+    peptideCount,
+    CART_TYPES,
+  } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
   const t = useT()
@@ -22,9 +35,16 @@ export default function CartSidebar() {
   }
 
   const handleCheckout = () => {
-    const hasPeptides = items.some(item => (item.department || 'Peptides') === 'Peptides')
+    const hasPeptides = activeCart === CART_TYPES.PEPTIDES
     setIsOpen(false)
-    navigate(!user && hasPeptides ? '/auth' : '/checkout')
+    navigate(
+      !user && hasPeptides
+        ? '/auth'
+        : `/checkout?cart=${activeCart}`,
+      !user && hasPeptides
+        ? { state: { peptideAccess: true, returnTo: `/checkout?cart=${CART_TYPES.PEPTIDES}` } }
+        : undefined
+    )
   }
 
   return (
@@ -36,7 +56,7 @@ export default function CartSidebar() {
       <div className={`fixed right-0 top-0 h-full w-full max-w-md z-50 bg-zinc-900 border-l border-zinc-800 flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex items-center justify-between p-5 border-b border-zinc-800">
           <h2 className="text-white font-bold text-xl">
-            {t.cart.title}
+            {activeCart === CART_TYPES.PEPTIDES ? 'Peptide Cart' : t.cart.title}
             {itemCount > 0 && (
               <span className="ml-2 text-sm text-zinc-400 font-normal">{t.cart.items(itemCount)}</span>
             )}
@@ -46,6 +66,17 @@ export default function CartSidebar() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 p-4 border-b border-zinc-800">
+          <button onClick={() => setActiveCart(CART_TYPES.MAIN)}
+            className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors ${activeCart === CART_TYPES.MAIN ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-zinc-800 bg-zinc-950/40 text-zinc-400 hover:text-white'}`}>
+            Main Cart <span className="ml-1 text-xs text-zinc-500">({mainCount})</span>
+          </button>
+          <button onClick={() => setActiveCart(CART_TYPES.PEPTIDES)}
+            className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors ${activeCart === CART_TYPES.PEPTIDES ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-zinc-800 bg-zinc-950/40 text-zinc-400 hover:text-white'}`}>
+            Peptide Cart <span className="ml-1 text-xs text-zinc-500">({peptideCount})</span>
           </button>
         </div>
 
@@ -95,6 +126,11 @@ export default function CartSidebar() {
 
         {items.length > 0 && (
           <div className="p-4 border-t border-zinc-800 space-y-3">
+            <div className={`rounded-xl border px-3 py-2 text-xs leading-relaxed ${activeCart === CART_TYPES.PEPTIDES ? 'border-amber-500/30 bg-amber-500/8 text-amber-300/90' : 'border-blue-500/25 bg-blue-500/8 text-blue-300/90'}`}>
+              {activeCart === CART_TYPES.PEPTIDES
+                ? 'Peptide items use their own verified checkout and manual payment flow.'
+                : 'Main cart items use secure card checkout and stay separate from peptides.'}
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-zinc-400 font-medium">{t.cart.subtotal}</span>
               <span className="text-white font-black text-2xl">${total.toFixed(2)}</span>

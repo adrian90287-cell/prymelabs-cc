@@ -1,6 +1,6 @@
 import { smsPhone } from './phoneVerification.js'
 
-const PAYMENT_LABEL = { zelle: 'Zelle', cashapp: 'Cash App', venmo: 'Venmo' }
+const PAYMENT_LABEL = { zelle: 'Zelle', cashapp: 'Cash App', venmo: 'Venmo', stripe: 'Card' }
 
 /** Escape HTML special chars to prevent XSS in email templates */
 function escHtml(str) {
@@ -173,7 +173,7 @@ export function customerConfirmationHtml({ order_number, customer_name, customer
   const addr = shipping
     ? `${escHtml(shipping.address)}, ${escHtml(shipping.city)}, ${escHtml(shipping.state)} ${escHtml(shipping.zip)}`
     : 'Not provided'
-  const trackUrl = customer_email ? `https://prymelabs.cc/track?order_number=${encodeURIComponent(order_number)}&email=${encodeURIComponent(customer_email)}` : null
+  const trackUrl = customer_email ? `https://prymelabs.net/track?order_number=${encodeURIComponent(order_number)}&email=${encodeURIComponent(customer_email)}` : null
   const body = `
     ${slipEyebrow('ORDER CONFIRMATION')}
     ${slipH1(`Thank you, ${escHtml(customer_name)}!`)}
@@ -200,7 +200,7 @@ export function customerConfirmationHtmlEs({ order_number, customer_name, custom
   const addr = shipping
     ? `${escHtml(shipping.address)}, ${escHtml(shipping.city)}, ${escHtml(shipping.state)} ${escHtml(shipping.zip)}`
     : 'No proporcionada'
-  const trackUrl = customer_email ? `https://prymelabs.cc/track?order_number=${encodeURIComponent(order_number)}&email=${encodeURIComponent(customer_email)}` : null
+  const trackUrl = customer_email ? `https://prymelabs.net/track?order_number=${encodeURIComponent(order_number)}&email=${encodeURIComponent(customer_email)}` : null
   const body = `
     ${slipEyebrow('CONFIRMACIÓN DE PEDIDO')}
     ${slipH1(`¡Gracias, ${escHtml(customer_name)}!`)}
@@ -358,7 +358,7 @@ export function ownerNotificationHtml({ order_number, customer_name, customer_em
         <strong style="color:#856404">⚡ Action Required:</strong> <span style="color:#856404">Once you've verified the ${method} payment of $${Number(total).toFixed(2)} landed in your account, tap “Confirm Payment” below — that marks the order paid and emails the customer.</span>
       </div>
       ${confirm_url ? `<a href="${confirm_url}" style="display:inline-block;background:#157347;color:#fff;font-weight:800;padding:13px 26px;border-radius:8px;text-decoration:none;font-size:15px;margin:0 8px 10px 0">✓ Confirm Payment</a>` : ''}
-      <a href="https://prymelabs.cc/admin" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:13px 26px;border-radius:8px;text-decoration:none;font-size:15px;margin-bottom:10px">Open Admin Dashboard →</a>
+      <a href="https://prymelabs.net/admin" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:13px 26px;border-radius:8px;text-decoration:none;font-size:15px;margin-bottom:10px">Open Admin Dashboard →</a>
       <div style="margin-top:16px;padding:10px 14px;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px">
         <p style="color:#92400e;font-size:11px;margin:0">⚠ All products sold for research use only. Not for human consumption. Support: support@prymelabs.net · (346) 550-9100</p>
       </div>
@@ -610,7 +610,7 @@ export function paymentExpiredHtml({ order_number, customer_name, items, total }
     ${slipH1(`Hi ${firstName}, we released your order`)}
     <p style="margin:0 0 18px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">We held order <strong style="color:#111111;">${escHtml(order_number)}</strong> as long as we could, but since payment wasn't received it has been automatically cancelled and the items returned to stock. No charge was made and nothing further is needed.</p>
     <p style="margin:0 0 28px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">Still want these items? You're always welcome to place a new order — we'd love to ship it out for you. 😊</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.cc/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Reorder Now &rarr;</a></td></tr></table>`
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.net/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Reorder Now &rarr;</a></td></tr></table>`
   return prymeEmailShell({ lang: 'en', rightLabel: 'ORDER CANCELLED', preheader: `Order ${order_number} was released — reorder anytime.`, body })
 }
 
@@ -622,7 +622,7 @@ export function paymentExpiredHtmlEs({ order_number, customer_name, items, total
     ${slipH1(`${greeting}, liberamos tu pedido`)}
     <p style="margin:0 0 18px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">Mantuvimos el pedido <strong style="color:#111111;">${escHtml(order_number)}</strong> el mayor tiempo posible, pero como no recibimos el pago, ha sido cancelado automáticamente y los productos regresaron al inventario. No se realizó ningún cargo y no necesitas hacer nada más.</p>
     <p style="margin:0 0 28px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">¿Todavía los quieres? Siempre puedes hacer un nuevo pedido — con gusto te lo enviamos. 😊</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.cc/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Volver a Ordenar &rarr;</a></td></tr></table>`
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.net/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Volver a Ordenar &rarr;</a></td></tr></table>`
   return prymeEmailShell({ lang: 'es', rightLabel: 'PEDIDO CANCELADO', preheader: `El pedido ${order_number} fue liberado — reordena cuando quieras.`, body })
 }
 
@@ -658,7 +658,7 @@ export function reviewRequestHtml({ customer_name, order_number, promo_code }) {
     ${slipH1(`How did we do, ${firstName}?`)}
     <p style="margin:0 0 26px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">Order <strong style="color:#111111;">${escHtml(order_number)}</strong> was delivered — we hope everything arrived perfectly. If you have a moment, we'd love to hear about your experience. Just reply to this email; your feedback helps us serve you better.</p>
     ${promoBlock}
-    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.cc/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Order Again &rarr;</a></td></tr></table>`
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.net/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Order Again &rarr;</a></td></tr></table>`
   return prymeEmailShell({ lang: 'en', rightLabel: 'THANK YOU', preheader: `How was order ${order_number}? We'd love your feedback.`, body })
 }
 
@@ -675,7 +675,7 @@ export function reviewRequestHtmlEs({ customer_name, order_number, promo_code })
     ${slipH1(greeting)}
     <p style="margin:0 0 26px 0;font-size:17px;line-height:1.65;color:#6b6f76;font-family:Arial,Helvetica,sans-serif;">El pedido <strong style="color:#111111;">${escHtml(order_number)}</strong> fue entregado — esperamos que todo haya llegado perfecto. Si tienes un momento, nos encantaría saber sobre tu experiencia. Solo responde a este correo; tus comentarios nos ayudan a mejorar.</p>
     ${promoBlock}
-    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.cc/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Ordenar de Nuevo &rarr;</a></td></tr></table>`
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center" class="pl-btn" style="margin:0 auto;"><tr><td align="center" style="background:#002b63;border-radius:12px;"><a href="https://prymelabs.net/shop" style="display:inline-block;padding:16px 40px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:800;font-family:Arial,Helvetica,sans-serif;">Ordenar de Nuevo &rarr;</a></td></tr></table>`
   return prymeEmailShell({ lang: 'es', rightLabel: 'GRACIAS', preheader: `¿Cómo estuvo el pedido ${order_number}? Nos encantaría tu opinión.`, body })
 }
 
@@ -714,7 +714,7 @@ export function ownerDigestHtml({ dateLabel, revenue, orderCount, awaitingPaymen
       <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eef2ff;border-radius:8px;overflow:hidden">${lowStockRows}</table>
       <h3 style="color:#091a28;font-size:14px;margin:20px 0 8px">Out of Stock${outOfStock.length ? ` (${outOfStock.length})` : ''}</h3>
       <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #fee2e2;border-radius:8px;overflow:hidden">${outOfStockRows}</table>
-      <div style="margin-top:22px;text-align:center"><a href="https://prymelabs.cc/admin" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:12px 26px;border-radius:8px;text-decoration:none;font-size:14px">Open Dashboard →</a></div>
+      <div style="margin-top:22px;text-align:center"><a href="https://prymelabs.net/admin" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:12px 26px;border-radius:8px;text-decoration:none;font-size:14px">Open Dashboard →</a></div>
     </div>
   </div>
 </body></html>`
@@ -765,7 +765,7 @@ function prymeEmailShell({ lang = 'en', rightLabel = '', preheader = '', body = 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
             <td class="pl-logo" valign="middle">
               <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td valign="middle" style="padding-right:8px;"><img src="https://prymelabs.cc/logo-mark-email.png" width="26" height="28" alt="" style="display:block;" /></td>
+                <td valign="middle" style="padding-right:8px;"><img src="https://prymelabs.net/logo-mark-email.png" width="26" height="28" alt="" style="display:block;" /></td>
                 <td valign="middle" style="font-size:34px;font-weight:800;letter-spacing:3px;color:#111111;font-family:Arial,Helvetica,sans-serif;">PRYME<span style="color:#4f7fd9;">LABS</span></td>
               </tr></table>
             </td>
@@ -784,7 +784,7 @@ function prymeEmailShell({ lang = 'en', rightLabel = '', preheader = '', body = 
         <tr><td class="pl-pad" style="padding:28px 40px;border-top:2px solid #111111;font-family:Arial,Helvetica,sans-serif;">
           <div style="font-size:18px;font-weight:800;letter-spacing:3px;color:#002b63;margin-bottom:12px;">PRYME LABS</div>
           <div style="font-size:14px;line-height:1.9;color:#111111;">
-            <strong>${F.website}:</strong> <a href="https://prymelabs.cc/shop" style="color:#111111;text-decoration:none;">prymelabs.cc/shop</a><br>
+            <strong>${F.website}:</strong> <a href="https://prymelabs.net/shop" style="color:#111111;text-decoration:none;">prymelabs.net/shop</a><br>
             <strong>${F.email}:</strong> <a href="mailto:support@prymelabs.net" style="color:#111111;text-decoration:none;">support@prymelabs.net</a><br>
             <strong>${F.phone}:</strong> 346-550-9100
           </div>
@@ -878,7 +878,7 @@ async function ownerSmsFallbackEmail(env, { message, error, status }) {
       ${status ? `Status: ${escHtml(status)}<br>` : ''}
       Error: ${escHtml(detail).slice(0, 1200)}
     </div>
-    <div style="margin-top:20px"><a href="https://prymelabs.cc/admin" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:11px 22px;border-radius:8px;text-decoration:none;font-size:13px">Open Dashboard</a></div>
+    <div style="margin-top:20px"><a href="https://prymelabs.net/admin" style="display:inline-block;background:#2563eb;color:#fff;font-weight:800;padding:11px 22px;border-radius:8px;text-decoration:none;font-size:13px">Open Dashboard</a></div>
   </div>
 </div>
 </body></html>`,

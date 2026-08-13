@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { useLanguage, useT } from '../context/LanguageContext'
@@ -13,6 +13,9 @@ const METHODS = [
   { id: 'cashapp', label: 'Cash App', emoji: '💚', active: 'border-green-500 bg-green-500/10' },
   { id: 'venmo',   label: 'Venmo',    emoji: '💙', active: 'border-blue-500 bg-blue-500/10' },
 ]
+
+const STRIPE_METHOD = { id: 'stripe', label: 'Card / Apple Pay', emoji: '💳', active: 'border-blue-500 bg-blue-500/10' }
+const ALL_METHODS = [STRIPE_METHOD, ...METHODS]
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 
@@ -108,7 +111,7 @@ function ReviewStep({ items, shipping, method, selectedRate, appliedPromo, appli
   subtotal, totalDiscount, shippingCost, shippingFree, taxRate, taxLabel, taxAmount, orderTotal, noTax,
   onConfirm, onBack, loading, error, t }) {
 
-  const methodObj = METHODS.find(m => m.id === method)
+  const methodObj = ALL_METHODS.find(m => m.id === method)
   const isEs = t.lang === 'ES'
   // Tax is on products only — shipping is not taxed
   const taxableBase = subtotal - totalDiscount
@@ -272,7 +275,7 @@ function ReviewStep({ items, shipping, method, selectedRate, appliedPromo, appli
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
-            {t.checkout.confirmOrder} — ${orderTotal.toFixed(2)}
+            {method === 'stripe' ? 'Continue to Secure Payment' : t.checkout.confirmOrder} — ${orderTotal.toFixed(2)}
           </span>
         )}
       </button>
@@ -285,7 +288,7 @@ export default function CheckoutPage() {
   const [step, setStep] = useState('form') // 'form' | 'review'
   const [method, setMethod] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
-  const [shipping, setShipping] = useState({ name: '', address: '', address2: '', city: '', state: '', zip: '', country: 'US', phone: '' })
+  const [shipping, setShipping] = useState({ name: '', address: '', address2: '', city: '', state: '', zip: '', country: 'US', phone: '', lat: null, lng: null })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -307,13 +310,31 @@ export default function CheckoutPage() {
   const sessionTokenRef = useRef(null)
   const orderPlacedRef = useRef(false) // guards the empty-cart redirect after a successful order
 
-  const { items, total, clearCart, reconcilePrices } = useCart()
+  const location = useLocation()
+  const requestedCart = new URLSearchParams(location.search).get('cart')
+  const {
+    activeCart,
+    setActiveCart,
+    cartItems,
+    cartTotals,
+    clearCart,
+    reconcilePrices,
+    CART_TYPES,
+  } = useCart()
   const { token, user } = useAuth()
   const { lang } = useLanguage()
   const navigate = useNavigate()
   const t = useT()
-  const hasPeptides = items.some(item => (item.department || 'Peptides') === 'Peptides')
+  const checkoutCart = requestedCart === CART_TYPES.PEPTIDES ? CART_TYPES.PEPTIDES : CART_TYPES.MAIN
+  const items = cartItems(checkoutCart)
+  const { total } = cartTotals(checkoutCart)
+  const hasPeptides = checkoutCart === CART_TYPES.PEPTIDES
   const isGuest = !token
+  const availableMethods = hasPeptides ? METHODS : [STRIPE_METHOD]
+
+  useEffect(() => {
+    if (activeCart !== checkoutCart) setActiveCart(checkoutCart)
+  }, [activeCart, checkoutCart, setActiveCart])
 
   // Re-price the cart against the live product feed before any total is computed
   // or the order is submitted. The cart persists in localStorage, so without this
@@ -326,8 +347,18 @@ export default function CheckoutPage() {
   }, [reconcilePrices])
 
   useEffect(() => {
-    if (!token && hasPeptides) navigate('/auth', { replace: true })
+    if (!token && hasPeptides) {
+      navigate('/auth', {
+        replace: true,
+        state: { peptideAccess: true, returnTo: `/checkout?cart=${CART_TYPES.PEPTIDES}` },
+      })
+    }
   }, [token, hasPeptides, navigate])
+
+  useEffect(() => {
+    if (!hasPeptides && method !== 'stripe') setMethod('stripe')
+    if (hasPeptides && method === 'stripe') setMethod('')
+  }, [hasPeptides, method])
 
   useEffect(() => {
     if (user?.email) setGuestEmail(user.email)
@@ -375,7 +406,23 @@ export default function CheckoutPage() {
 
   if (items.length === 0) return null
 
-  const updateShip = (f) => (e) => setShipping(p => ({ ...p, [f]: e.target.value }))
+  const clearLocalDeliveryEligibility = () => {
+    setLocalDeliveryEligible(false)
+    if (selectedRateId === LOCAL_DELIVERY_ID) setSelectedRateId(null)
+  }
+
+  const updateShip = (f) => (e) => {
+    const value = e.target.value
+    setShipping(p => {
+      const next = { ...p, [f]: value }
+      if (['address', 'city', 'state', 'zip'].includes(f)) {
+        next.lat = null
+        next.lng = null
+      }
+      return next
+    })
+    if (['address', 'city', 'state', 'zip'].includes(f)) clearLocalDeliveryEligibility()
+  }
 
   // Haversine distance in miles between two lat/lng points
   const haversineMiles = (lat1, lng1, lat2, lng2) => {
@@ -455,17 +502,20 @@ export default function CheckoutPage() {
         else if (type === 'administrative_area_level_1') state = comp.shortText
         else if (type === 'postal_code') zip = comp.longText
       }
+      const lat = typeof place.location?.lat === 'function' ? place.location.lat() : null
+      const lng = typeof place.location?.lng === 'function' ? place.location.lng() : null
       setShipping(prev => ({
         ...prev,
         address: [streetNumber, route].filter(Boolean).join(' '),
         city, state, zip,
+        lat: Number.isFinite(lat) ? lat : null,
+        lng: Number.isFinite(lng) ? lng : null,
       }))
       setAddressSuggestions([])
       if (places) sessionTokenRef.current = new places.AutocompleteSessionToken()
       // Check local delivery eligibility
-      if (place.location) {
-        checkLocalDeliveryEligibility(place.location.lat(), place.location.lng())
-      }
+      if (Number.isFinite(lat) && Number.isFinite(lng)) checkLocalDeliveryEligibility(lat, lng)
+      else clearLocalDeliveryEligibility()
     } catch { setAddressSuggestions([]) }
   }
 
@@ -511,6 +561,10 @@ export default function CheckoutPage() {
     if (!shipping.address?.trim() || !shipping.city?.trim() || !shipping.state || !shipping.zip?.trim()) {
       setError(t.checkout.shippingRequired); return
     }
+    if (isLocalDeliverySelected && !localDeliveryEligible) {
+      setError('Same-day local delivery is not available for this address.')
+      return
+    }
     if (!shipping.phone?.trim()) { setError('Phone number is required'); return }
     if (shippingRates.length > 0 && !selectedRateId) { setError(t.checkout.selectShippingMethod); return }
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -540,8 +594,12 @@ export default function CheckoutPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || t.checkout.networkError); return }
+      if (data.stripe_checkout_url) {
+        window.location.assign(data.stripe_checkout_url)
+        return
+      }
       orderPlacedRef.current = true // suppress the empty-cart redirect below
-      clearCart()
+      clearCart(checkoutCart)
       navigate('/order-confirmation', { state: { order: data } })
     } catch { setError(t.checkout.networkError) }
     finally { setLoading(false) }
@@ -821,8 +879,18 @@ export default function CheckoutPage() {
             {/* Payment */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-5">
               <h2 className="text-white font-bold mb-4">{t.checkout.paymentMethod}</h2>
-              <div className="grid grid-cols-3 gap-3">
-                {METHODS.map(m => (
+              {!hasPeptides && (
+                <p className="text-zinc-500 text-xs mb-3">
+                  Secure card checkout is used for non-peptide orders. Peptide products must be checked out separately.
+                </p>
+              )}
+              {hasPeptides && (
+                <p className="text-amber-400/80 text-xs mb-3">
+                  Peptide checkout uses verified manual payment only. Card checkout is disabled for this department.
+                </p>
+              )}
+              <div className={`grid gap-3 ${availableMethods.length === 1 ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                {availableMethods.map(m => (
                   <button key={m.id} onClick={() => setMethod(m.id)}
                     className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-150 ${method === m.id ? m.active : 'border-zinc-700 hover:border-zinc-600 bg-zinc-800/50'}`}>
                     <span className="text-3xl">{m.emoji}</span>

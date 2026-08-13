@@ -124,6 +124,8 @@ export async function onRequestGet({ request, env }) {
     check(Boolean(env.OWNER_EMAIL), 'Owner alert email', 'Owner email is configured for security/admin alerts.', 'warning'),
     check(Boolean(env.QUO_API_KEY && env.QUO_PHONE_NUMBER), 'SMS sender', 'SMS service is configured for owner/admin notification alerts.', 'warning'),
     check(Boolean(env.OWNER_PHONE), 'Owner SMS number', 'Owner phone is configured for SMS alerts when Quo accepts API messages.', 'info'),
+    check(Boolean(env.STRIPE_SECRET_KEY), 'Stripe card checkout', 'Stripe secret key is configured for non-peptide card checkout.', 'warning'),
+    check(Boolean(env.STRIPE_WEBHOOK_SECRET), 'Stripe webhook security', 'Stripe webhook signing secret is configured so card payments can be verified securely.', 'warning'),
   ]
 
   const criticalOpen = checks.filter(c => !c.ok && c.severity === 'critical').length

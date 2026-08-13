@@ -86,7 +86,7 @@ function OrderCard({ order }) {
   const [open, setOpen] = useState(false)
   const [reordering, setReordering] = useState(false)
   const [reorderNote, setReorderNote] = useState('')
-  const { addItem } = useCart()
+  const { addItem, CART_TYPES } = useCart()
   const { token } = useAuth()
   const navigate = useNavigate()
   const t = useT()
@@ -125,7 +125,10 @@ function OrderCard({ order }) {
       }
       if (added === 0) { setReorderNote(t.orders.reorderNone); return }
       if (unavailable.length) setReorderNote(t.orders.reorderPartial(unavailable.join(', ')))
-      else navigate('/checkout')
+      else {
+        const peptideOnly = (order.items || []).every(i => (i.department || 'Peptides') === 'Peptides')
+        navigate(`/checkout?cart=${peptideOnly ? CART_TYPES.PEPTIDES : CART_TYPES.MAIN}`)
+      }
     } catch { setReorderNote(t.orders.reorderError) }
     finally { setReordering(false) }
   }

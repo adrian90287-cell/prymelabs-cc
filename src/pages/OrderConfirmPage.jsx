@@ -3,15 +3,63 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useT } from '../context/LanguageContext'
+import { useCart } from '../context/CartContext'
 
 const METHOD_LABEL = { zelle: 'Zelle', cashapp: 'Cash App', venmo: 'Venmo' }
 
 export default function OrderConfirmPage() {
   const { state } = useLocation()
+  const location = useLocation()
   const navigate = useNavigate()
   const t = useT()
+  const { clearCart, CART_TYPES } = useCart()
+  const params = new URLSearchParams(location.search)
+  const stripeSuccess = params.get('stripe') === 'success'
+  const stripeOrder = params.get('order') || ''
 
-  useEffect(() => { if (!state?.order) navigate('/shop') }, [state, navigate])
+  useEffect(() => {
+    if (stripeSuccess && stripeOrder) {
+      clearCart(CART_TYPES.MAIN)
+      return
+    }
+    if (!state?.order) navigate('/shop')
+  }, [state, navigate, stripeSuccess, stripeOrder, clearCart, CART_TYPES])
+
+  if (stripeSuccess && stripeOrder) {
+    return (
+      <div className="min-h-screen bg-zinc-950">
+        <Navbar />
+        <main className="max-w-lg mx-auto px-4 py-12">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-5">
+              <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-black text-white mb-2">Payment Received</h1>
+            <p className="text-zinc-500">Thank you — Stripe has received your card payment.</p>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-zinc-500 text-sm">{t.confirm.orderNumber}</span>
+              <span className="text-blue-400 font-mono font-bold tracking-widest text-sm">{stripeOrder}</span>
+            </div>
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3 text-emerald-400 text-sm leading-relaxed">
+              Your order will show as paid once Stripe’s secure confirmation reaches our system. This usually happens within seconds.
+            </div>
+          </div>
+
+          <button onClick={() => navigate('/shop')}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-blue-900/30">
+            {t.confirm.continueShopping}
+          </button>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   if (!state?.order) return null
 
   const { order_number, payment_handle, order_total: total, payment_method } = state.order

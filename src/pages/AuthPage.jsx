@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage, useT } from '../context/LanguageContext'
 import Footer from '../components/Footer'
@@ -16,8 +16,13 @@ export default function AuthPage() {
   const [forgotSent, setForgotSent] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const t = useT()
   const { lang, setLanguage } = useLanguage()
+  const peptideAccessNotice = location.state?.peptideAccess === true
+  const returnTo = typeof location.state?.returnTo === 'string' && location.state.returnTo.startsWith('/') && !location.state.returnTo.startsWith('//')
+    ? location.state.returnTo
+    : '/'
 
   const update = (f) => (e) => setForm(p => ({ ...p, [f]: e.target.value }))
 
@@ -42,7 +47,7 @@ export default function AuthPage() {
       const data = await res.json()
       if (!res.ok) { setError(data.error || t.auth.networkError); return }
       login(data.token, data.user)
-      navigate('/')
+      navigate(returnTo)
     } catch { setError(t.auth.networkError) }
     finally { setLoading(false) }
   }
@@ -89,6 +94,12 @@ export default function AuthPage() {
         </div>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl">
+          {peptideAccessNotice && !forgotView && (
+            <div className="mb-5 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
+              <p className="text-sm font-bold text-blue-200">Peptides catalog access requires login and verified customer email.</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">Sign in or create an account, then complete email verification to view the Peptides catalog.</p>
+            </div>
+          )}
           {forgotView ? (
             <div className="space-y-4">
               <div>
