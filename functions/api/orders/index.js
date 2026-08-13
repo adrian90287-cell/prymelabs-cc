@@ -85,6 +85,20 @@ async function loadLocalDeliverySettings(env) {
   return cfg
 }
 
+async function guestCheckoutUserId(env) {
+  const existing = await env.DB.prepare("SELECT id FROM users WHERE username = 'guest_checkout' LIMIT 1").first()
+  if (existing?.id) return existing.id
+
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO users (name, username, email, password_hash, salt, phone, lang, phone_verified)
+    VALUES ('Guest Checkout', 'guest_checkout', 'guest-checkout@prymelabs.local', 'disabled', 'disabled', '', 'en', 0)
+  `).run()
+
+  const created = await env.DB.prepare("SELECT id FROM users WHERE username = 'guest_checkout' LIMIT 1").first()
+  if (!created?.id) throw new Error('Guest checkout user could not be created.')
+  return created.id
+}
+
 export async function onRequestPost({ request, env, waitUntil }) {
   const authHeader = request.headers.get('Authorization')
   let payload = null
@@ -339,6 +353,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   const customerEmail = payload?.email || guestEmail
   const customerName = payload?.name || String(shipping?.name || '').trim()
+  const orderUserId = payload?.sub || await guestCheckoutUserId(env)
 
   // ── Atomically reserve stock BEFORE creating the order ─────────────────────
   // A conditional decrement (stock_qty >= qty) only applies when enough stock
@@ -378,7 +393,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       tax_rate, tax_amount, order_total, local_delivery
     ) VALUES ('TEMP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    payload?.sub || 0, customerName, customerEmail,
+    orderUserId, customerName, customerEmail,
     JSON.stringify(dbItems), JSON.stringify(shipping), subtotal, payment_method,
     applied_promo_code, discount_amount, shipping_rate_name, shipping_cost,
     tax_rate, tax_amount, order_total, isLocalDelivery ? 1 : 0
