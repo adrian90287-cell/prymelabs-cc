@@ -7279,7 +7279,7 @@ export default function AdminPage() {
   // ── Storefront Tab (inline, simple) ──────────────────────────────────────
   function StorefrontTab() {
     const links = [
-      { href: '/shop',     label: 'Shop',          desc: 'Browse products as a customer',  icon: '🛍️',  color: 'bg-blue-600 hover:bg-blue-700 text-white' },
+      { href: '/',         label: 'Home',          desc: 'Open the customer home page',     icon: '🏠',  color: 'bg-blue-600 hover:bg-blue-700 text-white' },
       { href: '/auth',     label: 'Customer Login', desc: 'Sign in / registration page',   icon: '🔐',  color: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200' },
       { href: '/checkout', label: 'Checkout',       desc: 'View the checkout flow',         icon: '💳',  color: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200' },
       { href: '/orders',   label: 'My Orders',      desc: 'Customer order history page',    icon: '📦',  color: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200' },
