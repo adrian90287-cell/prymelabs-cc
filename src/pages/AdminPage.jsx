@@ -2473,7 +2473,18 @@ function InventoryTab() {
   }
 
   const deleteProduct = async (id) => {
-    if (!confirm('Delete this product? This cannot be undone.')) return
+    const attachedBundles = products.filter(p => Number(p.bundle_of_product_id) === Number(id))
+    const msg = attachedBundles.length > 0
+      ? `Delete this product and its ${attachedBundles.length} attached bundle pack${attachedBundles.length !== 1 ? 's' : ''}? This cannot be undone.`
+      : 'Delete this product? This cannot be undone.'
+    if (!confirm(msg)) return
+    for (const bundle of attachedBundles) {
+      await fetch('/api/admin/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ id: bundle.id }),
+      })
+    }
     await fetch('/api/admin/products', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
@@ -2522,16 +2533,41 @@ function InventoryTab() {
 
   // Treat a missing department as Peptides (matches the storefront default)
   const deptOf = (p) => DEPARTMENTS.includes(p.department) ? p.department : 'Peptides'
-  const deptCount = (dep) => products.filter(p => deptOf(p) === dep).length
+  const isBundleRow = (p) => p.bundle_of_product_id != null
+  const baseProducts = products.filter(p => !isBundleRow(p))
+  const byId = new Map(products.map(p => [p.id, p]))
+  const bundleChildrenByParent = products.reduce((map, p) => {
+    if (isBundleRow(p)) {
+      const key = Number(p.bundle_of_product_id)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(p)
+    }
+    return map
+  }, new Map())
+  for (const rows of bundleChildrenByParent.values()) {
+    rows.sort((a, b) => (Number(a.bundle_qty) || 0) - (Number(b.bundle_qty) || 0))
+  }
+  const bundlesFor = (p) => bundleChildrenByParent.get(Number(p.id)) || []
+  const deptCount = (dep) => baseProducts.filter(p => deptOf(p) === dep).length
+  const baseProductCount = baseProducts.length
+  const bundlePackCount = products.length - baseProductCount
 
-  const filtered = products.filter(p => {
+  const filtered = baseProducts.filter(p => {
     if (deptFilter !== 'all' && deptOf(p) !== deptFilter) return false
     if (catFilter !== 'all' && p.category !== catFilter) return false
     if (statusFilter === 'draft' && Number(p.is_draft || 0) !== 1) return false
     if (statusFilter === 'scheduled' && !(p.release_at && Number(p.release_at) > Math.floor(Date.now() / 1000))) return false
     if (statusFilter === 'live' && (Number(p.is_draft || 0) === 1 || (p.release_at && Number(p.release_at) > Math.floor(Date.now() / 1000)))) return false
     if (statusFilter === 'low' && !(p.low_stock_threshold > 0 && p.stock_qty > 0 && p.stock_qty <= p.low_stock_threshold)) return false
-    if (search) return p.name?.toLowerCase().includes(search.toLowerCase()) || p.code?.toLowerCase().includes(search.toLowerCase())
+    if (search) {
+      const q = search.toLowerCase()
+      const childMatch = bundlesFor(p).some(b =>
+        b.size?.toLowerCase().includes(q) ||
+        b.code?.toLowerCase().includes(q) ||
+        String(b.price ?? '').includes(q)
+      )
+      return p.name?.toLowerCase().includes(q) || p.code?.toLowerCase().includes(q) || childMatch
+    }
     return true
   })
 
@@ -2542,7 +2578,6 @@ function InventoryTab() {
   }
 
   // A bundle's live quantity is derived from its parent/base product's shared stock pool
-  const byId = new Map(products.map(p => [p.id, p]))
   const caseInfo = (p) => {
     if (p.bundle_of_product_id == null) return null
     const parent = byId.get(p.bundle_of_product_id)
@@ -2559,7 +2594,7 @@ function InventoryTab() {
       const s = String(v ?? '')
       return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
     }
-    const headers = ['Code', 'Product', 'Size', 'Category', 'In Stock', 'Quantity', 'Low Stock Alert', 'Price']
+    const headers = ['Code', 'Product', 'Size', 'Bundles', 'Category', 'In Stock', 'Quantity', 'Low Stock Alert', 'Price']
     const lines = filtered.map(p => {
       // Bundles report available whole bundles derived from the parent/base product stock
       let qty = Number(p.stock_qty) || 0
@@ -2568,8 +2603,9 @@ function InventoryTab() {
         const per = Math.max(1, Number(p.bundle_qty) || 1)
         qty = parent && Number(parent.stock_qty) > 0 ? Math.floor(Number(parent.stock_qty) / per) : 0
       }
+      const bundleSummary = bundlesFor(p).map(b => `${b.size || `${b.bundle_qty}-Pack Bundle`} $${Number(b.price || 0).toFixed(2)}`).join(' | ')
       return [
-        p.code, p.name, p.size, p.category,
+        p.code, p.name, p.size, bundleSummary, p.category,
         p.in_stock ? 'Yes' : 'No', qty,
         p.low_stock_threshold ?? 0, Number(p.price || 0).toFixed(2),
       ].map(esc).join(',')
@@ -2590,7 +2626,7 @@ function InventoryTab() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="text-zinc-400 text-sm">{products.length} products · {products.filter(p => p.in_stock).length} in stock · {products.filter(p => p.description_es).length} translated</div>
+        <div className="text-zinc-400 text-sm">{baseProductCount} products · {bundlePackCount} bundle pack{bundlePackCount !== 1 ? 's' : ''} · {baseProducts.filter(p => p.in_stock).length} in stock · {baseProducts.filter(p => p.description_es).length} translated</div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={downloadCsv}
             className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors flex items-center gap-1.5"
@@ -2786,7 +2822,7 @@ function InventoryTab() {
               <img src={heroImgs[dep]} alt="" className="w-7 h-7 rounded-lg object-cover border border-white/10 shrink-0" />
             )}
             {dep === 'all' ? 'All Departments' : dep}
-            <span className={`text-xs rounded-full px-1.5 ${deptFilter === dep ? 'bg-white/20' : 'bg-zinc-800'}`}>{dep === 'all' ? products.length : deptCount(dep)}</span>
+            <span className={`text-xs rounded-full px-1.5 ${deptFilter === dep ? 'bg-white/20' : 'bg-zinc-800'}`}>{dep === 'all' ? baseProductCount : deptCount(dep)}</span>
           </button>
         ))}
       </div>
@@ -2917,6 +2953,7 @@ function InventoryTab() {
             <tbody className="divide-y divide-zinc-800/60">
               {filtered.map(p => {
                 const isLow = p.low_stock_threshold > 0 && p.stock_qty > 0 && p.stock_qty <= p.low_stock_threshold
+                const childBundles = bundlesFor(p)
                 return (
                   <tr key={p.id} className={`hover:bg-zinc-800/30 transition-colors ${selected.has(p.id) ? 'bg-blue-600/10' : isLow ? 'bg-yellow-500/5' : ''}`}>
                     <td className="px-3 py-3 w-10">
@@ -2948,6 +2985,11 @@ function InventoryTab() {
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
                         <span className="text-xs font-semibold bg-blue-500/10 border border-blue-500/25 text-blue-300 px-1.5 py-0.5 rounded">{deptOf(p)}</span>
                         {p.size && <span className="text-zinc-500 text-xs">{p.size}</span>}
+                        {childBundles.length > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 font-bold">
+                            {childBundles.length} bundle pack{childBundles.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
                         {p.batch_number && (
                           <span className="text-xs font-mono bg-zinc-800 border border-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded">
                             {p.batch_number}
@@ -2956,6 +2998,22 @@ function InventoryTab() {
                         {p.is_draft === 1 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 font-bold">Draft</span>}
                         {p.release_at && Number(p.release_at) > Math.floor(Date.now() / 1000) && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 font-bold">Scheduled</span>}
                       </div>
+                      {childBundles.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {childBundles.map(b => {
+                            const per = Math.max(2, Number(b.bundle_qty) || 2)
+                            const available = Number(p.stock_qty) > 0 ? Math.floor((Number(p.stock_qty) || 0) / per) : 'untracked'
+                            return (
+                              <span key={b.id} className="inline-flex items-center gap-1 rounded-lg bg-zinc-950/60 border border-amber-500/20 px-2 py-1 text-[11px] text-zinc-300">
+                                <span className="text-amber-300 font-bold">{b.size || `${per}-Pack Bundle`}</span>
+                                <span className="text-zinc-600">·</span>
+                                <span className="text-amber-400 font-bold">${Number(b.price || 0).toFixed(2)}</span>
+                                <span className="text-zinc-600">· {available} available</span>
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-zinc-400 hidden md:table-cell">{p.category}</td>
                     {(() => {
@@ -2973,6 +3031,9 @@ function InventoryTab() {
                           <div className="text-amber-400 font-bold">${eff.price.toFixed(2)}</div>
                           {isAdjusted && (
                             <div className="text-zinc-600 text-xs leading-none mt-0.5">base ${Number(p.price).toFixed(2)}</div>
+                          )}
+                          {childBundles.length > 0 && (
+                            <div className="text-amber-300 text-[10px] leading-tight mt-1">{childBundles.length} bundle price{childBundles.length !== 1 ? 's' : ''}</div>
                           )}
                         </td>
                       )
