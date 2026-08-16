@@ -93,7 +93,7 @@ function isBundleProduct(p) {
 
 function bundleLabel(p) {
   const qty = Math.max(2, Number(p?.bundle_qty) || 2)
-  return `${qty}-item bundle`
+  return `${qty}-pack bundle`
 }
 
 export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasPrice = true }) {
@@ -221,7 +221,7 @@ export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasP
 
             {isBundle && (
               <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 mb-4">
-                <p className="text-amber-300 text-xs font-semibold">Bundle pricing · includes {Math.max(2, Number(selected.bundle_qty) || 2)} units</p>
+                <p className="text-amber-300 text-xs font-semibold">Bundle pricing · includes {Math.max(2, Number(selected.bundle_qty) || 2)} base pack{Math.max(2, Number(selected.bundle_qty) || 2) === 1 ? '' : 's'} / products</p>
               </div>
             )}
 

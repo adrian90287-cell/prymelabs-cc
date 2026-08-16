@@ -1824,24 +1824,24 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               className="w-4 h-4 accent-amber-500 mt-0.5"
             />
             <div>
-              <div className="text-white text-sm font-bold">This product is a bundle / multi-pack</div>
-              <p className="text-zinc-500 text-xs mt-0.5">Use this for 2-packs, 3-packs, starter kits, cup bundles, apparel sets, accessory packs, or peptide cases. The bundle has its own price, but inventory comes from the base product.</p>
+              <div className="text-white text-sm font-bold">This product is a bundle pricing option</div>
+              <p className="text-zinc-500 text-xs mt-0.5">Use this when customers can buy multiple of the base product for one promo price. Example: base product “Bar Soap Pack of 2” is $12.99; bundle option “3-Pack Bundle” includes 3 base packs for $24.99.</p>
             </div>
           </div>
           {isBundle && (
             <div className="grid sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
-                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Base Product Inventory</label>
+                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Base Product / Pack Inventory</label>
                 <select value={form.bundle_of_product_id || ''} onChange={set('bundle_of_product_id')} className={inp + ' w-full cursor-pointer'}>
-                  <option value="">Select the product this bundle pulls from…</option>
+                  <option value="">Select the base product this bundle pulls from…</option>
                   {baseProductOptions.map(p => (
                     <option key={p.id} value={p.id}>{p.name}{p.size ? ` · ${p.size}` : ''} · {p.department || 'Peptides'} · stock {Number(p.stock_qty) || 0}</option>
                   ))}
                 </select>
-                <p className="text-zinc-600 text-xs mt-1">Example: a 3-pack of Hair Wax should pull from the single Hair Wax product.</p>
+                <p className="text-zinc-600 text-xs mt-1">Use the same product name as the base item so it appears as a selectable option. Put the bundle wording in Size / Variant, like “3-Pack Bundle”.</p>
               </div>
               <div>
-                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Units Per Bundle</label>
+                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Base Packs In Bundle</label>
                 <input type="number" min="2" step="1" value={form.bundle_qty || '2'} onChange={set('bundle_qty')} className={inp + ' w-full'} />
                 {selectedBaseProduct && (
                   <p className="text-zinc-600 text-xs mt-1">
@@ -1851,7 +1851,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
               </div>
               <label className="sm:col-span-3 flex items-center gap-3 text-zinc-300 text-sm font-semibold bg-zinc-900/70 border border-zinc-800 rounded-xl px-3 py-2.5">
                 <input type="checkbox" checked={!!form.no_discount} onChange={set('no_discount')} className="w-4 h-4 accent-amber-500" />
-                Keep bundle price fixed / do not apply department sales or master price adjustments
+                Keep this bundle promo price fixed / do not apply department sales or master price adjustments
               </label>
             </div>
           )}
