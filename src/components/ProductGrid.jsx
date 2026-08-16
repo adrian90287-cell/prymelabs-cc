@@ -29,7 +29,11 @@ export const CATEGORY_ORDER = [
   'Stickers & Extras',
 ]
 
-// Group products by name; sort each group in-stock-first
+function bundlePackQty(p) {
+  return isBundleProduct(p) ? Math.max(2, Number(p?.bundle_qty) || 2) : 1
+}
+
+// Group products by name; bundle groups sort smallest pack first, other groups in-stock-first
 export function groupByName(products) {
   const map = new Map()
   for (const p of products) {
@@ -37,12 +41,17 @@ export function groupByName(products) {
     map.get(p.name).push(p)
   }
   for (const variants of map.values()) {
+    const hasBundleOptions = variants.some(isBundleProduct)
     variants.sort((a, b) => {
+      if (hasBundleOptions) {
+        const qtyDiff = bundlePackQty(a) - bundlePackQty(b)
+        if (qtyDiff !== 0) return qtyDiff
+      }
       const aIn = a.in_stock !== 0 && a.in_stock !== false
       const bIn = b.in_stock !== 0 && b.in_stock !== false
       if (aIn && !bIn) return -1
       if (!aIn && bIn) return 1
-      return 0
+      return Number(a.id || 0) - Number(b.id || 0)
     })
   }
   return Array.from(map.values())
