@@ -1654,6 +1654,29 @@ function epochFromDatetimeLocal(value) {
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : null
 }
 
+function bundleRowsForProduct(product, products) {
+  if (!product?.id) return []
+  return products
+    .filter(p => Number(p.bundle_of_product_id) === Number(product.id))
+    .sort((a, b) => (Number(a.bundle_qty) || 0) - (Number(b.bundle_qty) || 0))
+    .map(p => ({
+      id: p.id,
+      qty: String(Math.max(2, Number(p.bundle_qty) || 2)),
+      label: p.size || `${Math.max(2, Number(p.bundle_qty) || 2)}-Pack Bundle`,
+      price: String(p.price ?? ''),
+      compare_at_price: p.compare_at_price ? String(p.compare_at_price) : '',
+    }))
+}
+
+function nextBundleCode(baseCode, qty, products, currentId = null) {
+  const root = (baseCode || 'bundle').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'bundle'
+  const taken = new Set(products.filter(p => p.id !== currentId).map(p => String(p.code || '').toLowerCase()))
+  let code = `${root}-${qty}-pack`
+  let n = 2
+  while (taken.has(code.toLowerCase())) code = `${root}-${qty}-pack-${n++}`
+  return code
+}
+
 function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
   const [form, setForm] = useState(() => {
     const base = initial
@@ -1670,16 +1693,25 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [imgDrag, setImgDrag] = useState(false)
+  const [bundlePacks, setBundlePacks] = useState(() => bundleRowsForProduct(initial, existingProducts))
+  const [deletedBundleIds, setDeletedBundleIds] = useState([])
   const adminToken = getAdminToken()
   const showToast = useToast()
 
   const set = f => e => setForm(p => ({ ...p, [f]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
   const isBundle = !!form.is_bundle
-  const bundleQty = Math.max(1, Number(form.bundle_qty) || 1)
-  const baseProductOptions = existingProducts
-    .filter(p => p.id && p.id !== form.id && p.bundle_of_product_id == null)
-    .sort((a, b) => `${a.department || ''} ${a.name || ''}`.localeCompare(`${b.department || ''} ${b.name || ''}`))
-  const selectedBaseProduct = baseProductOptions.find(p => Number(p.id) === Number(form.bundle_of_product_id))
+  const isBaseProduct = !isBundle
+  const addBundlePack = () => setBundlePacks(rows => {
+    const maxQty = rows.reduce((m, r) => Math.max(m, Number(r.qty) || 1), 1)
+    const qty = Math.max(2, maxQty + 1)
+    return [...rows, { id: null, qty: String(qty), label: `${qty}-Pack Bundle`, price: '', compare_at_price: '' }]
+  })
+  const updateBundlePack = (idx, field, value) => setBundlePacks(rows => rows.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  const removeBundlePack = (idx) => setBundlePacks(rows => {
+    const row = rows[idx]
+    if (row?.id) setDeletedBundleIds(ids => [...ids, row.id])
+    return rows.filter((_, i) => i !== idx)
+  })
 
   // ── Auto-generate helpers ──────────────────────────────────────────────────
   const takenCodes = new Set(existingProducts.filter(p => p.id !== form.id).map(p => String(p.code || '').toLowerCase()))
@@ -1738,8 +1770,16 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
 
   const save = async () => {
     if (!form.name || !form.price) { setErr('Name and price are required'); return }
-    if (isBundle && !selectedBaseProduct) { setErr('Choose the base product this bundle pulls inventory from'); return }
-    if (isBundle && bundleQty < 2) { setErr('Bundle quantity must be at least 2'); return }
+    if (isBaseProduct) {
+      const seenQty = new Set()
+      for (const row of bundlePacks) {
+        if (!row.price || Number(row.price) <= 0) { setErr('Every bundle pack needs a promo price'); return }
+        if (!row.qty || Number(row.qty) < 2) { setErr('Bundle pack quantity must be at least 2'); return }
+        const qtyKey = String(Math.floor(Number(row.qty)))
+        if (seenQty.has(qtyKey)) { setErr(`You already have a ${qtyKey}-pack bundle. Use each pack quantity only once.`); return }
+        seenQty.add(qtyKey)
+      }
+    }
     setBusy(true); setErr('')
     try {
       const method = form.id ? 'PUT' : 'POST'
@@ -1748,7 +1788,7 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
         price: Number(form.price),
         release_at: epochFromDatetimeLocal(form.release_at),
         bundle_of_product_id: isBundle ? Number(form.bundle_of_product_id) : null,
-        bundle_qty: isBundle ? bundleQty : 1,
+        bundle_qty: isBundle ? Math.max(2, Number(form.bundle_qty) || 2) : 1,
         no_discount: isBundle ? 1 : (form.no_discount ? 1 : 0),
       }
       const res = await fetch('/api/admin/products', {
@@ -1758,6 +1798,47 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Save failed'); return }
+      const parentId = form.id || data.id
+      if (isBaseProduct && bundlePacks.length > 0 && !parentId) {
+        setErr('Product saved, but bundle packs could not be linked yet. Reopen the product and save the bundle packs again.')
+        return
+      }
+      if (isBaseProduct && parentId) {
+        for (const id of deletedBundleIds) {
+          await fetch('/api/admin/products', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+            body: JSON.stringify({ id }),
+          })
+        }
+        for (const row of bundlePacks) {
+          const qty = Math.max(2, Number(row.qty) || 2)
+          const childPayload = {
+            ...payload,
+            id: row.id || undefined,
+            code: nextBundleCode(payload.code || payload.name, qty, existingProducts, row.id),
+            size: row.label?.trim() || `${qty}-Pack Bundle`,
+            price: Number(row.price),
+            compare_at_price: row.compare_at_price ? Number(row.compare_at_price) : null,
+            stock_qty: 0,
+            low_stock_threshold: payload.low_stock_threshold,
+            bundle_of_product_id: Number(parentId),
+            bundle_qty: qty,
+            no_discount: 1,
+          }
+          const childMethod = row.id ? 'PUT' : 'POST'
+          const childRes = await fetch('/api/admin/products', {
+            method: childMethod,
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+            body: JSON.stringify(childPayload),
+          })
+          if (!childRes.ok) {
+            const childData = await childRes.json().catch(() => ({}))
+            setErr(childData.error || 'Saved product, but one bundle pack failed to save')
+            return
+          }
+        }
+      }
       showToast(form.id ? '✓ Product updated' : '✓ Product created')
       onSave()
     } catch { setErr('Network error') }
@@ -1810,49 +1891,66 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
           <p className="text-zinc-600 text-xs mt-1">Shows as red strikethrough on storefront</p>
         </div>
         <div className="sm:col-span-2 bg-amber-500/8 border border-amber-500/20 rounded-2xl p-4 space-y-3">
-          <div className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              checked={isBundle}
-              onChange={e => setForm(p => ({
-                ...p,
-                is_bundle: e.target.checked,
-                bundle_of_product_id: e.target.checked ? (p.bundle_of_product_id || '') : '',
-                bundle_qty: e.target.checked ? (Number(p.bundle_qty) >= 2 ? p.bundle_qty : '2') : '1',
-                no_discount: e.target.checked ? true : p.no_discount,
-              }))}
-              className="w-4 h-4 accent-amber-500 mt-0.5"
-            />
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-white text-sm font-bold">This product is a bundle pricing option</div>
-              <p className="text-zinc-500 text-xs mt-0.5">Use this when customers can buy multiple of the base product for one promo price. Example: base product “Bar Soap Pack of 2” is $12.99; bundle option “3-Pack Bundle” includes 3 base packs for $24.99.</p>
+              <div className="text-white text-sm font-bold">Bundle Pack Pricing</div>
+              {isBaseProduct ? (
+                <p className="text-zinc-500 text-xs mt-0.5">Add promo bundle options for this same product. Example: base price $12.99, 2-pack $19.99, 3-pack $24.99. The storefront shows them as selectable options, and inventory comes from this product.</p>
+              ) : (
+                <p className="text-amber-300 text-xs mt-0.5">This is already a bundle option. Edit the original/base product to manage all bundle pack prices together.</p>
+              )}
             </div>
+            {isBaseProduct && (
+              <button type="button" onClick={addBundlePack}
+                className="shrink-0 px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-lg transition-colors">
+                + Add Bundle
+              </button>
+            )}
           </div>
-          {isBundle && (
-            <div className="grid sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Base Product / Pack Inventory</label>
-                <select value={form.bundle_of_product_id || ''} onChange={set('bundle_of_product_id')} className={inp + ' w-full cursor-pointer'}>
-                  <option value="">Select the base product this bundle pulls from…</option>
-                  {baseProductOptions.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}{p.size ? ` · ${p.size}` : ''} · {p.department || 'Peptides'} · stock {Number(p.stock_qty) || 0}</option>
-                  ))}
-                </select>
-                <p className="text-zinc-600 text-xs mt-1">Use the same product name as the base item so it appears as a selectable option. Put the bundle wording in Size / Variant, like “3-Pack Bundle”.</p>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Base Packs In Bundle</label>
-                <input type="number" min="2" step="1" value={form.bundle_qty || '2'} onChange={set('bundle_qty')} className={inp + ' w-full'} />
-                {selectedBaseProduct && (
-                  <p className="text-zinc-600 text-xs mt-1">
-                    Available bundles: {Number(selectedBaseProduct.stock_qty) > 0 ? Math.floor((Number(selectedBaseProduct.stock_qty) || 0) / bundleQty) : 'untracked'}
-                  </p>
-                )}
-              </div>
-              <label className="sm:col-span-3 flex items-center gap-3 text-zinc-300 text-sm font-semibold bg-zinc-900/70 border border-zinc-800 rounded-xl px-3 py-2.5">
-                <input type="checkbox" checked={!!form.no_discount} onChange={set('no_discount')} className="w-4 h-4 accent-amber-500" />
-                Keep this bundle promo price fixed / do not apply department sales or master price adjustments
-              </label>
+          {isBaseProduct && (
+            <div className="space-y-2">
+              {bundlePacks.length === 0 ? (
+                <div className="bg-zinc-950/40 border border-zinc-800 rounded-xl px-3 py-3 text-zinc-500 text-xs">
+                  No bundle packs yet. Click “Add Bundle” to create 2-pack, 3-pack, or sale bundle pricing for this product.
+                </div>
+              ) : (
+                bundlePacks.map((row, idx) => {
+                  const qty = Math.max(2, Number(row.qty) || 2)
+                  const available = Number(form.stock_qty) > 0 ? Math.floor((Number(form.stock_qty) || 0) / qty) : 'untracked'
+                  return (
+                    <div key={row.id || idx} className="grid grid-cols-1 sm:grid-cols-[0.8fr_1.4fr_1fr_1fr_auto] gap-2 items-end bg-zinc-950/40 border border-zinc-800 rounded-xl p-3">
+                      <div>
+                        <label className="block text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Packs</label>
+                        <input type="number" min="2" step="1" value={row.qty} onChange={e => {
+                          const nextQty = e.target.value
+                          const nextLabel = (!row.label || /^\d+-Pack Bundle$/i.test(row.label)) ? `${Math.max(2, Number(nextQty) || 2)}-Pack Bundle` : row.label
+                          setBundlePacks(rows => rows.map((r, i) => i === idx ? { ...r, qty: nextQty, label: nextLabel } : r))
+                        }} className={inpSm + ' w-full'} />
+                      </div>
+                      <div>
+                        <label className="block text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Storefront Option Label</label>
+                        <input type="text" value={row.label} onChange={e => updateBundlePack(idx, 'label', e.target.value)} placeholder={`${qty}-Pack Bundle`} className={inpSm + ' w-full'} />
+                      </div>
+                      <div>
+                        <label className="block text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Promo Price</label>
+                        <input type="number" min="0" step="0.01" value={row.price} onChange={e => updateBundlePack(idx, 'price', e.target.value)} placeholder="24.99" className={inpSm + ' w-full'} />
+                      </div>
+                      <div>
+                        <label className="block text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Was Price</label>
+                        <input type="number" min="0" step="0.01" value={row.compare_at_price || ''} onChange={e => updateBundlePack(idx, 'compare_at_price', e.target.value)} placeholder="Optional" className={inpSm + ' w-full'} />
+                      </div>
+                      <button type="button" onClick={() => removeBundlePack(idx)}
+                        className="px-2.5 py-2 bg-zinc-800 hover:bg-red-500/15 border border-zinc-700 hover:border-red-500/30 text-zinc-400 hover:text-red-300 text-xs font-bold rounded-lg transition-colors">
+                        Remove
+                      </button>
+                      <p className="sm:col-span-5 text-zinc-600 text-[11px]">
+                        Available bundle orders: {available}. Each purchase subtracts {qty} from this product’s stock.
+                      </p>
+                    </div>
+                  )
+                })
+              )}
+              <p className="text-zinc-600 text-xs">Bundle prices are fixed by default, so they do not get hit again by department sales or master price adjustments.</p>
             </div>
           )}
         </div>

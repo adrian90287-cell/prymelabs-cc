@@ -139,7 +139,7 @@ export async function onRequestPost({ request, env }) {
   // Auto-translate description to Spanish (best-effort, doesn't block save)
   const description_es = description ? await translateToSpanish(env, description) : null
 
-  await env.DB.prepare(
+  const result = await env.DB.prepare(
     `INSERT INTO products
        (code, name, size, tagline, description, description_es, compare_at_price,
         image_url, photos_json, category, department, collections, in_stock, display_order, stock_qty, low_stock_threshold, price, batch_number, weight_oz, is_draft, release_at,
@@ -156,7 +156,7 @@ export async function onRequestPost({ request, env }) {
     bundle.parentId, bundle.bundleQty, bundle.noDiscount
   ).run()
 
-  return json({ ok: true })
+  return json({ ok: true, id: result?.meta?.last_row_id || null })
 }
 
 export async function onRequestPut({ request, env, waitUntil }) {
