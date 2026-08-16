@@ -87,6 +87,15 @@ export function ImageFallback({ name }) {
   )
 }
 
+function isBundleProduct(p) {
+  return p?.bundle_of_product_id != null
+}
+
+function bundleLabel(p) {
+  const qty = Math.max(2, Number(p?.bundle_qty) || 2)
+  return `${qty}-item bundle`
+}
+
 export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasPrice = true }) {
   const { addItem } = useCart()
   const t = useT()
@@ -119,6 +128,7 @@ export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasP
   const hasDiscount = selected.compare_at_price && Number(selected.compare_at_price) > Number(selected.price)
   const showImage = !!mainSrc && !imgFailed
   const hasMultipleSizes = group.length > 1
+  const isBundle = isBundleProduct(selected)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -146,6 +156,11 @@ export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasP
             {selected.category && (
               <span className="absolute top-3 left-3 bg-zinc-950/85 backdrop-blur text-blue-400 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-800/40">
                 {t.shop.categoryNames?.[selected.category] || selected.category}
+              </span>
+            )}
+            {isBundle && (
+              <span className="absolute bottom-3 right-3 bg-amber-500 text-zinc-950 text-xs font-black px-2 py-0.5 rounded-full">
+                Bundle
               </span>
             )}
             {hasDiscount && inStock && (
@@ -195,12 +210,19 @@ export function ProductModal({ group, initialVariant, onClose, coaDocs, showWasP
                 <span className="text-red-400 text-base line-through font-medium">${Number(selected.compare_at_price).toFixed(2)}</span>
               )}
               <span className="text-amber-400 font-black text-3xl">${Number(selected.price).toFixed(2)}</span>
+              {isBundle && <span className="text-amber-300 text-xs font-bold uppercase tracking-wider">{bundleLabel(selected)}</span>}
             </div>
 
             {(selected.description || selected.description_es) && (
               <p className="text-zinc-400 text-sm leading-relaxed mb-4">
                 {isEs ? (selected.description_es || selected.description) : selected.description}
               </p>
+            )}
+
+            {isBundle && (
+              <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 mb-4">
+                <p className="text-amber-300 text-xs font-semibold">Bundle pricing · includes {Math.max(2, Number(selected.bundle_qty) || 2)} units</p>
+              </div>
             )}
 
             {coa && (
@@ -258,6 +280,7 @@ export function ProductGroupCard({ group, onOpenModal, showWasPrice = true }) {
   const showImage = !!selected.image_url && !imgFailed
   const hasMultipleSizes = group.length > 1
   const anyInStock = group.some(v => v.in_stock !== 0 && v.in_stock !== false)
+  const isBundle = isBundleProduct(selected)
 
   return (
     <div className={`bg-zinc-900 border rounded-xl overflow-hidden group transition-all duration-300 flex flex-col ${anyInStock ? 'border-zinc-800 hover:border-blue-700/50' : 'border-zinc-800/50'}`}>
@@ -278,6 +301,9 @@ export function ProductGroupCard({ group, onOpenModal, showWasPrice = true }) {
         {hasDiscount && inStock && (
           <span className="absolute top-2 right-2 bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{t.shop.sale}</span>
         )}
+        {isBundle && (
+          <span className="absolute bottom-2 right-2 bg-amber-500 text-zinc-950 text-xs font-black px-2 py-0.5 rounded-full">Bundle</span>
+        )}
         <span className={`absolute bottom-2 left-2 text-xs font-black px-2 py-0.5 rounded-full border ${inStock ? 'bg-green-500/20 border-green-500/40 text-green-400' : 'bg-red-500/20 border-red-500/40 text-red-400'}`}>
           {inStock ? t.shop.inStock : t.product.outOfStock}
         </span>
@@ -291,6 +317,7 @@ export function ProductGroupCard({ group, onOpenModal, showWasPrice = true }) {
           <h3 className="text-white font-bold text-sm leading-tight cursor-pointer hover:text-blue-400 transition-colors" onClick={() => onOpenModal(group, selected)}>
             {selected.name}
           </h3>
+          {isBundle && <div className="text-amber-300 text-[11px] font-bold mt-1">{bundleLabel(selected)}</div>}
           {(selected.description || selected.description_es) && (
             <p className="text-zinc-500 text-xs mt-1 line-clamp-2 leading-relaxed">
               {isEs ? (selected.description_es || selected.description) : selected.description}

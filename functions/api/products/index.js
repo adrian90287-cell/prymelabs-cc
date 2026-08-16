@@ -44,7 +44,7 @@ export async function onRequestGet({ request, env }) {
   const wasAmountEnabled = cfg.was_amount_enabled === '1';
   const wasAmount = wasAmountEnabled ? (Number(cfg.was_amount) || 0) : 0;
 
-  // Look up table so a case can read its parent single's stock
+  // Look up table so a bundle can read its parent/base product stock
   const byId = new Map((products || []).map(p => [p.id, p]));
 
   const released = (products || []).filter(p => isReleasedProduct(p));
@@ -58,7 +58,7 @@ export async function onRequestGet({ request, env }) {
       masterAdjust, saleConfig, wasAmountEnabled, wasAmount,
     });
 
-    // A case's availability is derived from its parent's shared vial pool.
+    // A bundle's availability is derived from its parent/base product stock pool.
     let in_stock = p.in_stock;
     let stock_qty = p.stock_qty;
     if (isBundle) {
@@ -66,7 +66,7 @@ export async function onRequestGet({ request, env }) {
       const per = Math.max(1, Number(p.bundle_qty) || 1);
       if (parent) {
         if (parent.stock_qty > 0) {
-          stock_qty = Math.floor(parent.stock_qty / per); // whole cases available
+          stock_qty = Math.floor(parent.stock_qty / per); // whole bundles available
           in_stock = parent.in_stock && stock_qty > 0 ? 1 : 0;
         } else {
           // parent untracked/unlimited → mirror its in_stock flag, stay untracked

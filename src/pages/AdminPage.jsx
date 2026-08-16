@@ -1629,7 +1629,7 @@ function OrdersTab({ data, loading, onRefresh, onSwitchTab }) {
 
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
 
-const EMPTY_PRODUCT = { code: '', name: '', size: '', tagline: '', description: '', description_es: '', price: '', compare_at_price: '', image_url: '', photos: [], category: 'Research Supplies', department: 'Peptides', collections: [], display_order: '', stock_qty: '', low_stock_threshold: '5', batch_number: '', weight_oz: '', is_draft: false, release_at: '' }
+const EMPTY_PRODUCT = { code: '', name: '', size: '', tagline: '', description: '', description_es: '', price: '', compare_at_price: '', image_url: '', photos: [], category: 'Research Supplies', department: 'Peptides', collections: [], display_order: '', stock_qty: '', low_stock_threshold: '5', batch_number: '', weight_oz: '', is_draft: false, release_at: '', is_bundle: false, bundle_of_product_id: '', bundle_qty: '1', no_discount: false }
 const MAX_PHOTOS = 10
 
 // Parse a product's photos into an array (photos array, photos_json string, or a
@@ -1657,7 +1657,7 @@ function epochFromDatetimeLocal(value) {
 function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
   const [form, setForm] = useState(() => {
     const base = initial
-      ? { ...initial, photos: parsePhotos(initial), is_draft: initial.is_draft === 1 || initial.is_draft === true, release_at: datetimeLocalFromEpoch(initial.release_at) }
+      ? { ...initial, photos: parsePhotos(initial), is_draft: initial.is_draft === 1 || initial.is_draft === true, release_at: datetimeLocalFromEpoch(initial.release_at), is_bundle: initial.bundle_of_product_id != null, bundle_of_product_id: initial.bundle_of_product_id || '', bundle_qty: String(initial.bundle_qty || 1), no_discount: initial.no_discount === 1 || initial.no_discount === true || initial.bundle_of_product_id != null }
       : { ...EMPTY_PRODUCT }
     // New product (no id): pre-fill the next display order from the inventory,
     // even when a department was pre-selected from the tab.
@@ -1674,6 +1674,12 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
   const showToast = useToast()
 
   const set = f => e => setForm(p => ({ ...p, [f]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+  const isBundle = !!form.is_bundle
+  const bundleQty = Math.max(1, Number(form.bundle_qty) || 1)
+  const baseProductOptions = existingProducts
+    .filter(p => p.id && p.id !== form.id && p.bundle_of_product_id == null)
+    .sort((a, b) => `${a.department || ''} ${a.name || ''}`.localeCompare(`${b.department || ''} ${b.name || ''}`))
+  const selectedBaseProduct = baseProductOptions.find(p => Number(p.id) === Number(form.bundle_of_product_id))
 
   // ── Auto-generate helpers ──────────────────────────────────────────────────
   const takenCodes = new Set(existingProducts.filter(p => p.id !== form.id).map(p => String(p.code || '').toLowerCase()))
@@ -1732,13 +1738,23 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
 
   const save = async () => {
     if (!form.name || !form.price) { setErr('Name and price are required'); return }
+    if (isBundle && !selectedBaseProduct) { setErr('Choose the base product this bundle pulls inventory from'); return }
+    if (isBundle && bundleQty < 2) { setErr('Bundle quantity must be at least 2'); return }
     setBusy(true); setErr('')
     try {
       const method = form.id ? 'PUT' : 'POST'
+      const payload = {
+        ...form,
+        price: Number(form.price),
+        release_at: epochFromDatetimeLocal(form.release_at),
+        bundle_of_product_id: isBundle ? Number(form.bundle_of_product_id) : null,
+        bundle_qty: isBundle ? bundleQty : 1,
+        no_discount: isBundle ? 1 : (form.no_discount ? 1 : 0),
+      }
       const res = await fetch('/api/admin/products', {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
-        body: JSON.stringify({ ...form, price: Number(form.price), release_at: epochFromDatetimeLocal(form.release_at) }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Save failed'); return }
@@ -1792,6 +1808,53 @@ function ProductForm({ initial, onSave, onCancel, existingProducts = [] }) {
           <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Was Price ($)</label>
           <input type="number" step="0.01" placeholder="Leave blank if no sale" value={form.compare_at_price || ''} onChange={set('compare_at_price')} className={inp + ' w-full'} />
           <p className="text-zinc-600 text-xs mt-1">Shows as red strikethrough on storefront</p>
+        </div>
+        <div className="sm:col-span-2 bg-amber-500/8 border border-amber-500/20 rounded-2xl p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={isBundle}
+              onChange={e => setForm(p => ({
+                ...p,
+                is_bundle: e.target.checked,
+                bundle_of_product_id: e.target.checked ? (p.bundle_of_product_id || '') : '',
+                bundle_qty: e.target.checked ? (Number(p.bundle_qty) >= 2 ? p.bundle_qty : '2') : '1',
+                no_discount: e.target.checked ? true : p.no_discount,
+              }))}
+              className="w-4 h-4 accent-amber-500 mt-0.5"
+            />
+            <div>
+              <div className="text-white text-sm font-bold">This product is a bundle / multi-pack</div>
+              <p className="text-zinc-500 text-xs mt-0.5">Use this for 2-packs, 3-packs, starter kits, cup bundles, apparel sets, accessory packs, or peptide cases. The bundle has its own price, but inventory comes from the base product.</p>
+            </div>
+          </div>
+          {isBundle && (
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Base Product Inventory</label>
+                <select value={form.bundle_of_product_id || ''} onChange={set('bundle_of_product_id')} className={inp + ' w-full cursor-pointer'}>
+                  <option value="">Select the product this bundle pulls from…</option>
+                  {baseProductOptions.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.size ? ` · ${p.size}` : ''} · {p.department || 'Peptides'} · stock {Number(p.stock_qty) || 0}</option>
+                  ))}
+                </select>
+                <p className="text-zinc-600 text-xs mt-1">Example: a 3-pack of Hair Wax should pull from the single Hair Wax product.</p>
+              </div>
+              <div>
+                <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Units Per Bundle</label>
+                <input type="number" min="2" step="1" value={form.bundle_qty || '2'} onChange={set('bundle_qty')} className={inp + ' w-full'} />
+                {selectedBaseProduct && (
+                  <p className="text-zinc-600 text-xs mt-1">
+                    Available bundles: {Number(selectedBaseProduct.stock_qty) > 0 ? Math.floor((Number(selectedBaseProduct.stock_qty) || 0) / bundleQty) : 'untracked'}
+                  </p>
+                )}
+              </div>
+              <label className="sm:col-span-3 flex items-center gap-3 text-zinc-300 text-sm font-semibold bg-zinc-900/70 border border-zinc-800 rounded-xl px-3 py-2.5">
+                <input type="checkbox" checked={!!form.no_discount} onChange={set('no_discount')} className="w-4 h-4 accent-amber-500" />
+                Keep bundle price fixed / do not apply department sales or master price adjustments
+              </label>
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1.5">Department <span className="text-blue-400 normal-case">· home-page tab</span></label>
@@ -2380,7 +2443,7 @@ function InventoryTab() {
     filtered.sort((a, b) => b.name?.localeCompare(a.name))
   }
 
-  // A case's live quantity is derived from its parent single's shared vial pool
+  // A bundle's live quantity is derived from its parent/base product's shared stock pool
   const byId = new Map(products.map(p => [p.id, p]))
   const caseInfo = (p) => {
     if (p.bundle_of_product_id == null) return null
@@ -2400,7 +2463,7 @@ function InventoryTab() {
     }
     const headers = ['Code', 'Product', 'Size', 'Category', 'In Stock', 'Quantity', 'Low Stock Alert', 'Price']
     const lines = filtered.map(p => {
-      // Cases report available whole cases derived from the parent vial pool
+      // Bundles report available whole bundles derived from the parent/base product stock
       let qty = Number(p.stock_qty) || 0
       if (p.bundle_of_product_id != null) {
         const parent = byId.get(p.bundle_of_product_id)
@@ -2823,7 +2886,7 @@ function InventoryTab() {
                           if (ci) return (
                             <>
                               <span className="text-white font-semibold">{ci.avail}</span>
-                              <span className="text-zinc-600 text-[10px] leading-tight" title={`Auto: ${ci.parentQty} vials ÷ ${ci.per}`}>cases · auto</span>
+                              <span className="text-zinc-600 text-[10px] leading-tight" title={`Auto: ${ci.parentQty} base units ÷ ${ci.per}`}>bundles · auto</span>
                             </>
                           )
                           return (

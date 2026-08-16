@@ -8,6 +8,29 @@ import { ensureProductLaunchColumns, releaseAtFromInput } from '../../_utils/pro
 // 'Peptides' — see migrate_v22.sql.
 const DEPARTMENTS = ['Health & Wellness', 'Beauty & Grooming', 'Apparel & Gear', 'Peptides']
 
+function normalizeBundleFields(body, id = null) {
+  const rawParentId = body.bundle_of_product_id
+  const parentId = rawParentId == null || rawParentId === ''
+    ? null
+    : Number(rawParentId)
+  const bundleQty = parentId ? Math.max(1, Math.floor(Number(body.bundle_qty) || 1)) : 1
+  const noDiscount = parentId ? 1 : (body.no_discount ? 1 : 0)
+  if (rawParentId != null && rawParentId !== '' && (!Number.isInteger(parentId) || parentId <= 0)) return { error: 'Invalid base product for bundle' }
+  if (parentId && id && Number(parentId) === Number(id)) return { error: 'A bundle cannot use itself as the base product' }
+  if (parentId && bundleQty < 2) return { error: 'Bundle quantity must be at least 2' }
+  return { parentId, bundleQty, noDiscount }
+}
+
+async function validateBundleParent(env, parentId) {
+  if (!parentId) return null
+  const parent = await env.DB.prepare(
+    'SELECT id, bundle_of_product_id FROM products WHERE id = ?'
+  ).bind(parentId).first()
+  if (!parent) return 'Base product for bundle was not found'
+  if (parent.bundle_of_product_id != null) return 'A bundle cannot use another bundle as its base product'
+  return null
+}
+
 // Normalize a client-provided collections value to a clean JSON-array string.
 function normalizeCollections(value) {
   let arr = value
@@ -98,8 +121,12 @@ export async function onRequestPost({ request, env }) {
 
   const { code, name, size, tagline, description, image_url, photos, category, department, collections, display_order, stock_qty, low_stock_threshold, compare_at_price, batch_number, weight_oz, is_draft, release_at } = body
   if (!name || !body.price) return json({ error: 'name and price are required' }, 400)
+  const bundle = normalizeBundleFields(body)
+  if (bundle.error) return json({ error: bundle.error }, 400)
+  const bundleParentError = await validateBundleParent(env, bundle.parentId)
+  if (bundleParentError) return json({ error: bundleParentError }, 400)
 
-  const qty = Number(stock_qty) || 0
+  const qty = bundle.parentId ? 0 : (Number(stock_qty) || 0)
   const auto_in_stock = qty > 0 ? 1 : 0
   const slug = (code || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
   const cap = compare_at_price ? Number(compare_at_price) : null
@@ -115,8 +142,9 @@ export async function onRequestPost({ request, env }) {
   await env.DB.prepare(
     `INSERT INTO products
        (code, name, size, tagline, description, description_es, compare_at_price,
-        image_url, photos_json, category, department, collections, in_stock, display_order, stock_qty, low_stock_threshold, price, batch_number, weight_oz, is_draft, release_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        image_url, photos_json, category, department, collections, in_stock, display_order, stock_qty, low_stock_threshold, price, batch_number, weight_oz, is_draft, release_at,
+        bundle_of_product_id, bundle_qty, no_discount)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     slug, name, size || null, tagline || null,
     description || null, description_es,
@@ -124,7 +152,8 @@ export async function onRequestPost({ request, env }) {
     category || 'Research Supplies', dept, cols, auto_in_stock,
     display_order || 999, qty, Number(low_stock_threshold) ?? 5,
     Number(body.price), batch_number?.trim() || null, Number(weight_oz) || 0,
-    is_draft ? 1 : 0, releaseAt
+    is_draft ? 1 : 0, releaseAt,
+    bundle.parentId, bundle.bundleQty, bundle.noDiscount
   ).run()
 
   return json({ ok: true })
@@ -143,8 +172,12 @@ export async function onRequestPut({ request, env, waitUntil }) {
 
   const { id, code, name, size, tagline, description, image_url, photos, category, department, collections, display_order, stock_qty, low_stock_threshold, compare_at_price, batch_number, weight_oz, is_draft, release_at } = body
   if (!id) return json({ error: 'id required' }, 400)
+  const bundle = normalizeBundleFields(body, id)
+  if (bundle.error) return json({ error: bundle.error }, 400)
+  const bundleParentError = await validateBundleParent(env, bundle.parentId)
+  if (bundleParentError) return json({ error: bundleParentError }, 400)
 
-  const qty = Number(stock_qty) || 0
+  const qty = bundle.parentId ? 0 : (Number(stock_qty) || 0)
   const auto_in_stock = qty > 0 ? 1 : 0
   const cap = compare_at_price ? Number(compare_at_price) : null
   const dept = DEPARTMENTS.includes(department) ? department : 'Peptides'
@@ -167,7 +200,8 @@ export async function onRequestPut({ request, env, waitUntil }) {
     `UPDATE products
      SET code=?, name=?, size=?, tagline=?, description=?, description_es=?,
          compare_at_price=?, image_url=?, photos_json=?, category=?, department=?, collections=?, in_stock=?,
-         display_order=?, stock_qty=?, low_stock_threshold=?, price=?, batch_number=?, weight_oz=?, is_draft=?, release_at=?
+         display_order=?, stock_qty=?, low_stock_threshold=?, price=?, batch_number=?, weight_oz=?, is_draft=?, release_at=?,
+         bundle_of_product_id=?, bundle_qty=?, no_discount=?
      WHERE id=?`
   ).bind(
     code, name, size || null, tagline || null,
@@ -175,7 +209,8 @@ export async function onRequestPut({ request, env, waitUntil }) {
     cap, primaryImage, photosJson, category, dept, cols, auto_in_stock,
     display_order || 999, qty, Number(low_stock_threshold) ?? 5,
     Number(body.price), batch_number?.trim() || null, Number(weight_oz) || 0,
-    is_draft ? 1 : 0, releaseAt, id
+    is_draft ? 1 : 0, releaseAt,
+    bundle.parentId, bundle.bundleQty, bundle.noDiscount, id
   ).run()
 
   // Restocked: out of stock → in stock. Notify the waitlist in the background.
