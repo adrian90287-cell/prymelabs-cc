@@ -23,6 +23,7 @@ export default function AuthPage() {
   const returnTo = typeof location.state?.returnTo === 'string' && location.state.returnTo.startsWith('/') && !location.state.returnTo.startsWith('//')
     ? location.state.returnTo
     : '/'
+  const showPeptideNav = peptideAccessNotice && !forgotView
 
   const update = (f) => (e) => setForm(p => ({ ...p, [f]: e.target.value }))
 
@@ -98,6 +99,16 @@ export default function AuthPage() {
             <div className="mb-5 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
               <p className="text-sm font-bold text-blue-200">Peptides catalog access requires login and verified customer email.</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-400">Sign in or create an account, then complete email verification to view the Peptides catalog.</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => navigate('/shop')}
+                  className="rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm font-bold text-zinc-300 transition-colors hover:border-blue-500/50 hover:text-white">
+                  ← Back to Store
+                </button>
+                <button type="button" onClick={() => navigate('/')}
+                  className="rounded-xl border border-blue-500/40 bg-blue-600/15 px-3 py-2 text-sm font-bold text-blue-200 transition-colors hover:bg-blue-600/25 hover:text-white">
+                  Home
+                </button>
+              </div>
             </div>
           )}
           {forgotView ? (
@@ -224,6 +235,13 @@ export default function AuthPage() {
           </>
           )}
         </div>
+        {showPeptideNav && (
+          <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+            <button type="button" onClick={() => navigate('/shop')} className="text-zinc-500 transition-colors hover:text-white">Back to Store</button>
+            <span className="text-zinc-700">•</span>
+            <button type="button" onClick={() => navigate('/')} className="text-zinc-500 transition-colors hover:text-white">Home</button>
+          </div>
+        )}
         <p className="text-center text-zinc-600 text-xs mt-5">{t.auth.ageNotice}</p>
       </div>
       </div>

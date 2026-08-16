@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const DISMISS_KEY = 'pl_email_verify_dismissed'
@@ -11,6 +12,7 @@ async function readJson(res) {
 
 export default function PhoneVerificationPrompt({ required = false, onVerified }) {
   const { user, token, updateSession } = useAuth()
+  const navigate = useNavigate()
   const [dismissed, setDismissed] = useState(() => !required && sessionStorage.getItem(DISMISS_KEY) === '1')
   const [sent, setSent] = useState(false)
   const [code, setCode] = useState('')
@@ -109,6 +111,18 @@ export default function PhoneVerificationPrompt({ required = false, onVerified }
           </form>
         )}
         {err && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-sm">{err}</div>}
+        {required && (
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button type="button" onClick={() => navigate('/shop')}
+              className="rounded-xl border border-zinc-700 bg-zinc-800/70 px-3 py-2 text-sm font-bold text-zinc-300 transition-colors hover:border-blue-500/50 hover:text-white">
+              ← Back to Store
+            </button>
+            <button type="button" onClick={() => navigate('/')}
+              className="rounded-xl border border-blue-500/40 bg-blue-600/15 px-3 py-2 text-sm font-bold text-blue-200 transition-colors hover:bg-blue-600/25 hover:text-white">
+              Home
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
