@@ -24,6 +24,8 @@ export async function onRequestGet({ request, env }) {
       MAX(o.created_at) AS last_order_at
     FROM users u
     LEFT JOIN orders o ON o.user_id = u.id
+    WHERE COALESCE(u.username, '') != 'guest_checkout'
+      AND COALESCE(u.email, '') != 'guest-checkout@prymelabs.local'
     GROUP BY u.id
     ORDER BY u.created_at DESC, u.id DESC
   `).all()
@@ -38,6 +40,8 @@ export async function onRequestPut({ request, env }) {
 
   const { id, name, phone, lang, email_unsubscribed } = body
   if (!id) return json({ error: 'User id required' }, 400)
+  const user = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(id).first()
+  if (user?.username === 'guest_checkout') return json({ error: 'System guest checkout record cannot be edited' }, 403)
 
   const cleanName = name?.trim()
   if (cleanName !== undefined && cleanName.length === 0) return json({ error: 'Name cannot be empty' }, 400)
@@ -66,6 +70,8 @@ export async function onRequestDelete({ request, env }) {
 
   const { id } = body
   if (!id) return json({ error: 'User id required' }, 400)
+  const user = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(id).first()
+  if (user?.username === 'guest_checkout') return json({ error: 'System guest checkout record cannot be deleted' }, 403)
 
   // Nullify user_id on orders so order history is preserved for records
   await env.DB.prepare('UPDATE orders SET user_id = NULL WHERE user_id = ?').bind(id).run()

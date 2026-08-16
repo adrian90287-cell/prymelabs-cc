@@ -59,6 +59,8 @@ export async function onRequestGet({ request, env }) {
     const { results } = await env.DB.prepare(`
       SELECT id, name, username, email, phone, phone_verified, lang, email_unsubscribed, sms_unsubscribed, created_at
       FROM users
+      WHERE COALESCE(username, '') != 'guest_checkout'
+        AND COALESCE(email, '') != 'guest-checkout@prymelabs.local'
       ORDER BY created_at DESC, id DESC
       LIMIT 10000
     `).all()

@@ -25,8 +25,8 @@ export async function onRequestGet({ request, env }) {
   ] = await Promise.all([
     first(env, "SELECT COUNT(*) AS n FROM orders WHERE deleted_at IS NULL AND status = 'pending'"),
     first(env, "SELECT COUNT(*) AS n FROM products WHERE stock_qty > 0 AND low_stock_threshold > 0 AND stock_qty <= low_stock_threshold"),
-    first(env, "SELECT COUNT(*) AS n FROM users WHERE phone IS NOT NULL AND COALESCE(phone_verified,0) != 1"),
-    first(env, 'SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', sevenDays),
+    first(env, "SELECT COUNT(*) AS n FROM users WHERE COALESCE(username, '') != 'guest_checkout' AND COALESCE(email, '') != 'guest-checkout@prymelabs.local' AND phone IS NOT NULL AND COALESCE(phone_verified,0) != 1"),
+    first(env, "SELECT COUNT(*) AS n FROM users WHERE COALESCE(username, '') != 'guest_checkout' AND COALESCE(email, '') != 'guest-checkout@prymelabs.local' AND created_at >= ?", sevenDays),
     first(env, 'SELECT COUNT(*) AS n FROM department_waitlist WHERE notified_at IS NULL'),
     first(env, 'SELECT COUNT(*) AS n FROM admin_audit_log WHERE created_at >= ?', sevenDays),
     first(env, `SELECT COUNT(*) AS n FROM admin_users WHERE is_active = 1 AND totp_enabled != 1 AND (

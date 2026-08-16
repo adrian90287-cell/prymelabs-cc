@@ -73,6 +73,8 @@ export async function onRequestPost({ request, env }) {
   const { results: users } = await env.DB.prepare(
     `SELECT id, name, email, lang FROM users
      WHERE email IS NOT NULL AND email != ''
+     AND COALESCE(username, '') != 'guest_checkout'
+     AND COALESCE(email, '') != 'guest-checkout@prymelabs.local'
      AND (email_unsubscribed IS NULL OR email_unsubscribed = 0)`
   ).all()
 

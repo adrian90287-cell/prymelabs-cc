@@ -87,11 +87,18 @@ async function loadLocalDeliverySettings(env) {
 
 async function guestCheckoutUserId(env) {
   const existing = await env.DB.prepare("SELECT id FROM users WHERE username = 'guest_checkout' LIMIT 1").first()
-  if (existing?.id) return existing.id
+  if (existing?.id) {
+    await env.DB.prepare(`
+      UPDATE users
+      SET email_unsubscribed = 1, sms_unsubscribed = 1
+      WHERE id = ?
+    `).bind(existing.id).run()
+    return existing.id
+  }
 
   await env.DB.prepare(`
-    INSERT OR IGNORE INTO users (name, username, email, password_hash, salt, phone, lang, phone_verified)
-    VALUES ('Guest Checkout', 'guest_checkout', 'guest-checkout@prymelabs.local', 'disabled', 'disabled', '', 'en', 0)
+    INSERT OR IGNORE INTO users (name, username, email, password_hash, salt, phone, lang, phone_verified, email_unsubscribed, sms_unsubscribed)
+    VALUES ('Guest Checkout', 'guest_checkout', 'guest-checkout@prymelabs.local', 'disabled', 'disabled', '', 'en', 0, 1, 1)
   `).run()
 
   const created = await env.DB.prepare("SELECT id FROM users WHERE username = 'guest_checkout' LIMIT 1").first()
